@@ -1,0 +1,20 @@
+[project]
+name = "material-testing-analyzer"
+version = "0.1.0"
+description = "Aplicación de escritorio para análisis de pruebas de materiales (tracción, flexión, impacto)"
+requires-python = ">=3.10"
+dependencies = [
+    "PyQt6>=6.6",
+    "matplotlib>=3.8",
+    "pandas>=2.1",
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "openpyxl>=3.1",
+]
+
+[project.scripts]
+materiales = "app.main:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.backends.legacy:build"
