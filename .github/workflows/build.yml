@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'  # Ejecutar cuando hagas push de un tag como v1.0.0
 
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     runs-on: windows-latest
