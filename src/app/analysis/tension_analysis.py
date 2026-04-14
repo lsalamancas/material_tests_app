@@ -121,7 +121,14 @@ def _yield_stress_offset(strain_pct: np.ndarray, stress_MPa: np.ndarray,
     return float(stress_yield), float(strain_yield * 100)
 
 
-def calculate(specimen: TensionSpecimen) -> TensionProperties:
+def calculate(specimen: TensionSpecimen, offset_pct: float = 0.2) -> TensionProperties:
+    """
+    Calcula propiedades de tracción.
+    
+    Args:
+        specimen: Datos del espécimen
+        offset_pct: Parámetro de deformación compensada (default 0.2%, típico para aceros)
+    """
     props = TensionProperties(specimen_name=specimen.name)
 
     stress = specimen.stress_MPa
@@ -161,19 +168,16 @@ def calculate(specimen: TensionSpecimen) -> TensionProperties:
         props.elastic_strain_range = strain[s_idx:e_idx + 1]
         props.elastic_stress_fit   = (E / 100) * strain[s_idx:e_idx + 1]
 
-    # Límite elástico 0.2% offset
-    sy, ey = _yield_stress_offset(strain, stress, E)
+    # Límite elástico con offset variable
+    sy, ey = _yield_stress_offset(strain, stress, E, offset=offset_pct)
     props.yield_stress_MPa = sy
     props.yield_strain_pct = ey
 
     if not np.isnan(sy) and not np.isnan(E):
         # Línea offset para graficar
-        offset_frac = 0.2 / 100
-        s_range = np.linspace(0.2, strain[max_idx], 100)
+        offset_frac = offset_pct / 100
+        s_range = np.linspace(offset_pct, strain[max_idx], 100)
         props.offset_strain_range = s_range
-        props.offset_stress_line  = (E / 100) * (s_range / 100 - offset_frac) * 100 * 100
-
-        # Recalcular correctamente
         props.offset_stress_line = E * (s_range / 100 - offset_frac)
 
     # Tenacidad = área bajo la curva σ-ε (trapz, en MPa·% → ÷100 para fracción → MJ/m³)

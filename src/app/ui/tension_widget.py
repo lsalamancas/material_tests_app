@@ -24,6 +24,7 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QCheckBox,
+    QDoubleSpinBox,
     QFileDialog,
     QHBoxLayout,
     QLabel,
@@ -72,6 +73,7 @@ class TensionWidget(QWidget):
         self._props: list[TensionProperties] = []
         self._checkboxes: list[QCheckBox] = []
         self._worker: _LoadWorker | None = None
+        self._offset_pct: float = 0.2  # Parámetro de deformación compensada
         self._build_ui()
 
     # ------------------------------------------------------------------ UI
@@ -98,6 +100,22 @@ class TensionWidget(QWidget):
         top.addWidget(self._load_btn)
         top.addWidget(self._file_label)
         top.addStretch()
+        
+        # Control de offset para cálculo de límite elástico
+        offset_lbl = QLabel("Offset (%):")
+        offset_lbl.setFont(QFont("Segoe UI", 9))
+        self._offset_spin = QDoubleSpinBox()
+        self._offset_spin.setFont(QFont("Segoe UI", 9))
+        self._offset_spin.setMinimum(0.01)
+        self._offset_spin.setMaximum(10.0)
+        self._offset_spin.setSingleStep(0.1)
+        self._offset_spin.setValue(0.2)
+        self._offset_spin.setFixedWidth(80)
+        self._offset_spin.setDecimals(2)
+        self._offset_spin.valueChanged.connect(self._on_offset_changed)
+        
+        top.addWidget(offset_lbl)
+        top.addWidget(self._offset_spin)
         root.addLayout(top)
 
         # Selección de especímenes
@@ -201,11 +219,26 @@ class TensionWidget(QWidget):
             f"{len(data.specimens)} especímenes cargados"
             + (f" · {data.test_speed_mm_per_min:.0f} mm/min" if not np.isnan(data.test_speed_mm_per_min) else "")
         )
-        self._props = [tension_analysis.calculate(sp) for sp in data.specimens]
+        self._recalculate_properties()
         self._build_specimen_checkboxes()
         self._refresh_plot()
         self._refresh_table()
         self._download_btn.setEnabled(True)
+
+    def _on_offset_changed(self, value: float) -> None:
+        """Recalcular propiedades cuando cambia el offset."""
+        self._offset_pct = value
+        if self._data:
+            self._recalculate_properties()
+            self._refresh_plot()
+            self._refresh_table()
+
+    def _recalculate_properties(self) -> None:
+        """Recalcular todas las propiedades con el offset actual."""
+        if not self._data:
+            return
+        self._props = [tension_analysis.calculate(sp, offset_pct=self._offset_pct) 
+                       for sp in self._data.specimens]
 
     def _on_load_error(self, msg: str) -> None:
         self._load_btn.setEnabled(True)
@@ -291,7 +324,7 @@ class TensionWidget(QWidget):
                             color=color, linestyle="--", linewidth=1.3, alpha=0.7,
                             label=f"{sp.name} (E)")
 
-                # Línea offset 0.2%
+                # Línea offset con parámetro variable
                 if props.offset_strain_range is not None and len(props.offset_strain_range) > 0:
                     ax.plot(props.offset_strain_range,
                             props.offset_stress_line,
@@ -335,6 +368,7 @@ class TensionWidget(QWidget):
             p = self._props[indices[0]]
             rows = [
                 ("Espécimen",       p.specimen_name),
+                ("Offset (σy)",     f"{self._offset_pct:.2f} %"),
                 ("Módulo de Young", f"{p.youngs_modulus_MPa:.0f} MPa" if not np.isnan(p.youngs_modulus_MPa) else "–"),
                 ("Límite elástico (σy)", f"{p.yield_stress_MPa:.2f} MPa" if not np.isnan(p.yield_stress_MPa) else "–"),
                 ("Deform. en σy",   f"{p.yield_strain_pct:.3f} %" if not np.isnan(p.yield_strain_pct) else "–"),
