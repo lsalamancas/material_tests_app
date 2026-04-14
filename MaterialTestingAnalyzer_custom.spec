@@ -1,0 +1,53 @@
+# -*- mode: python ; coding: utf-8 -*-
+a = Analysis(
+    ['run_app.py'],
+    pathex=[],
+    binaries=[],
+    datas=[
+        ('flexion.xlsx', '.'),
+        ('impacto.xlsx', '.'),
+        ('tension.xlsx', '.'),
+        ('src', 'src'),
+    ],
+    hiddenimports=[
+        'app',
+        'app.ui',
+        'app.analysis',
+        'app.parsers',
+        'numpy',
+        'pandas',
+        'matplotlib',
+        'scipy',
+        'openpyxl',
+        'plotly',
+        'plotly.graph_objects',
+        'narwhals',
+    ],
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludedimports=[],
+    noarchive=False,
+)
+pyz = PYZ(a.pure, a.zipped_data, cipher=None)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    [],
+    name='MaterialTestingAnalyzer',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
+    console=False,
+    disable_windowed_traceback=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+)

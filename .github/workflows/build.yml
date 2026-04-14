@@ -11,70 +11,42 @@ permissions:
 jobs:
   build-windows:
     runs-on: windows-latest
-    
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.13'
-    
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install pyinstaller
-    
+
     - name: Build executable
       run: |
-        python -m PyInstaller MaterialTestingAnalyzer.spec
-    
+        python -m PyInstaller MaterialTestingAnalyzer_custom.spec --clean
+
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: MaterialTestingAnalyzer-Windows
-        path: dist/MaterialTestingAnalyzer
-
-  build-linux:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.13'
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pyinstaller
-    
-    - name: Build executable
-      run: |
-        python -m PyInstaller MaterialTestingAnalyzer.spec
-    
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: MaterialTestingAnalyzer-Linux
-        path: dist/MaterialTestingAnalyzer
+        path: dist/MaterialTestingAnalyzer.exe
 
   create-release:
-    needs: [build-windows, build-linux]
+    needs: [build-windows]
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/download-artifact@v4
-    
+
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          MaterialTestingAnalyzer-Windows/*
-          MaterialTestingAnalyzer-Linux/*
+          MaterialTestingAnalyzer-Windows/MaterialTestingAnalyzer.exe
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
