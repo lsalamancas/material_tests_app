@@ -16,58 +16,20 @@ from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QApplication
 
 from app.ui.main_window import MainWindow
+from app.ui.styles import LIGHT_STYLESHEET
 
 
 def main() -> None:
     app = QApplication(sys.argv)
     app.setApplicationName("Material Testing Analyzer")
-    app.setApplicationVersion("0.1.0")
+    app.setApplicationVersion("0.2.0")
 
-    # Fuente base
+    # Fuente base moderna
     font = QFont("Segoe UI", 10)
     app.setFont(font)
 
-    # Estilo global minimalista
-    app.setStyleSheet("""
-        QWidget {
-            background-color: #FAFAFA;
-            color: #212121;
-        }
-        QScrollBar:vertical {
-            width: 8px; background: #F0F0F0; border: none;
-        }
-        QScrollBar::handle:vertical {
-            background: #BDBDBD; border-radius: 4px; min-height: 20px;
-        }
-        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
-        QScrollBar:horizontal {
-            height: 8px; background: #F0F0F0; border: none;
-        }
-        QScrollBar::handle:horizontal {
-            background: #BDBDBD; border-radius: 4px; min-width: 20px;
-        }
-        QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }
-        QTableWidget {
-            gridline-color: #E0E0E0;
-            border: 1px solid #E0E0E0;
-            border-radius: 4px;
-        }
-        QHeaderView::section {
-            background-color: #EEEEEE;
-            border: none;
-            border-bottom: 1px solid #BDBDBD;
-            padding: 4px 8px;
-            font-weight: bold;
-        }
-        QComboBox {
-            border: 1px solid #BDBDBD;
-            border-radius: 4px;
-            padding: 4px 8px;
-            background: white;
-        }
-        QComboBox::drop-down { border: none; }
-        QComboBox:hover { border-color: #1976D2; }
-    """)
+    # Aplicar estilos modernos
+    app.setStyleSheet(LIGHT_STYLESHEET)
 
     window = MainWindow()
     window.show()
