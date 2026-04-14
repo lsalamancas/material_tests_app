@@ -24,7 +24,6 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QCheckBox,
-    QDoubleSpinBox,
     QFileDialog,
     QHBoxLayout,
     QLabel,
@@ -32,6 +31,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSizePolicy,
+    QSlider,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -102,20 +102,24 @@ class TensionWidget(QWidget):
         top.addStretch()
         
         # Control de offset para cálculo de límite elástico
-        offset_lbl = QLabel("Offset (%):")
+        offset_lbl = QLabel("Offset (σy):")
         offset_lbl.setFont(QFont("Segoe UI", 9))
-        self._offset_spin = QDoubleSpinBox()
-        self._offset_spin.setFont(QFont("Segoe UI", 9))
-        self._offset_spin.setMinimum(0.01)
-        self._offset_spin.setMaximum(2.0)  # Máximo realista en materiales
-        self._offset_spin.setSingleStep(0.1)
-        self._offset_spin.setValue(0.2)
-        self._offset_spin.setFixedWidth(80)
-        self._offset_spin.setDecimals(2)
-        self._offset_spin.valueChanged.connect(self._on_offset_changed)
+        
+        self._offset_slider = QSlider(Qt.Orientation.Horizontal)
+        self._offset_slider.setMinimum(1)      # 0.01%
+        self._offset_slider.setMaximum(200)    # 2.0%
+        self._offset_slider.setValue(20)       # 0.2% (default)
+        self._offset_slider.setFixedWidth(150)
+        self._offset_slider.sliderMoved.connect(self._on_offset_changed)
+        self._offset_slider.valueChanged.connect(self._on_offset_changed)
+        
+        self._offset_value_lbl = QLabel("0.20%")
+        self._offset_value_lbl.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+        self._offset_value_lbl.setFixedWidth(40)
         
         top.addWidget(offset_lbl)
-        top.addWidget(self._offset_spin)
+        top.addWidget(self._offset_slider)
+        top.addWidget(self._offset_value_lbl)
         root.addLayout(top)
 
         # Selección de especímenes
@@ -225,9 +229,12 @@ class TensionWidget(QWidget):
         self._refresh_table()
         self._download_btn.setEnabled(True)
 
-    def _on_offset_changed(self, value: float) -> None:
+    def _on_offset_changed(self, value: int) -> None:
         """Recalcular propiedades cuando cambia el offset."""
-        self._offset_pct = value
+        # El slider trabaja con enteros (1-200), convertir a porcentaje (0.01-2.0)
+        self._offset_pct = value / 100.0
+        self._offset_value_lbl.setText(f"{self._offset_pct:.2f}%")
+        
         if self._data:
             self._recalculate_properties()
             self._refresh_plot()
