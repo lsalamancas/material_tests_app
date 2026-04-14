@@ -28,7 +28,7 @@ jobs:
         python -m PyInstaller run_app.py --name MaterialTestingAnalyzer --onedir --collect-all matplotlib --collect-all openpyxl
     
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: MaterialTestingAnalyzer-Windows
         path: dist/MaterialTestingAnalyzer
@@ -55,7 +55,7 @@ jobs:
         python -m PyInstaller run_app.py --name MaterialTestingAnalyzer --onedir --collect-all matplotlib --collect-all openpyxl
     
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: MaterialTestingAnalyzer-Linux
         path: dist/MaterialTestingAnalyzer
@@ -65,7 +65,7 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/download-artifact@v3
+    - uses: actions/download-artifact@v4
     
     - name: Create Release
       uses: softprops/action-gh-release@v1
