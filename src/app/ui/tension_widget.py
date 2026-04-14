@@ -285,20 +285,27 @@ class TensionWidget(QWidget):
                 has_curve = True
 
                 # Módulo de Young (línea punteada)
-                if props.elastic_strain_range is not None:
+                if props.elastic_strain_range is not None and len(props.elastic_strain_range) > 0:
                     ax.plot(props.elastic_strain_range,
                             props.elastic_stress_fit,
-                            color=color, linestyle="--", linewidth=1, alpha=0.6)
+                            color=color, linestyle="--", linewidth=1.3, alpha=0.7,
+                            label=f"{sp.name} (E)")
+
+                # Línea offset 0.2%
+                if props.offset_strain_range is not None and len(props.offset_strain_range) > 0:
+                    ax.plot(props.offset_strain_range,
+                            props.offset_stress_line,
+                            color=color, linestyle=":", linewidth=1, alpha=0.5)
 
                 # Punto UTS
                 if not np.isnan(props.uts_MPa):
                     ax.scatter([props.uts_strain_pct], [props.uts_MPa],
-                               color=color, s=40, zorder=5)
+                               color=color, s=50, zorder=5, marker="o")
 
                 # Límite elástico 0.2%
                 if not np.isnan(props.yield_stress_MPa):
                     ax.scatter([props.yield_strain_pct], [props.yield_stress_MPa],
-                               color=color, marker="^", s=50, zorder=5)
+                               color=color, s=60, zorder=5, marker="^")
             else:
                 # Sin series — graficar solo puntos resumen
                 if not np.isnan(sp.max_stress_MPa):
