@@ -79,11 +79,11 @@ class TestCard(QPushButton):
         top = QHBoxLayout()
         icon_lbl = QLabel(test_info["icon"])
         icon_lbl.setFont(QFont("Segoe UI", 28))
-        icon_lbl.setStyleSheet("color: rgba(255,255,255,0.9);")
+        icon_lbl.setStyleSheet("background-color: transparent; color: rgba(255,255,255,0.9);")
 
         title_lbl = QLabel(test_info["label"])
         title_lbl.setFont(QFont("Segoe UI", 22, QFont.Weight.Bold))
-        title_lbl.setStyleSheet("color: white;")
+        title_lbl.setStyleSheet("background-color: transparent; color: white;")
 
         top.addWidget(icon_lbl)
         top.addWidget(title_lbl)
@@ -92,13 +92,14 @@ class TestCard(QPushButton):
 
         sub_lbl = QLabel(test_info["subtitle"])
         sub_lbl.setFont(QFont("Segoe UI", 10))
-        sub_lbl.setStyleSheet("color: rgba(255,255,255,0.85);")
+        sub_lbl.setStyleSheet("background-color: transparent;color: rgba(255,255,255,0.85);")
         sub_lbl.setWordWrap(True)
         layout.addWidget(sub_lbl)
 
         # Impedir que el layout interno capture los clics del botón
         for child in self.findChildren(QLabel):
             child.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        
 
 
 class HomeScreen(QWidget):
