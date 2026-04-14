@@ -28,7 +28,7 @@ jobs:
     
     - name: Build executable
       run: |
-        python -m PyInstaller run_app.py --name MaterialTestingAnalyzer --onedir --collect-all matplotlib --collect-all openpyxl
+        python -m PyInstaller MaterialTestingAnalyzer.spec
     
     - name: Upload artifact
       uses: actions/upload-artifact@v4
@@ -55,7 +55,7 @@ jobs:
     
     - name: Build executable
       run: |
-        python -m PyInstaller run_app.py --name MaterialTestingAnalyzer --onedir --collect-all matplotlib --collect-all openpyxl
+        python -m PyInstaller MaterialTestingAnalyzer.spec
     
     - name: Upload artifact
       uses: actions/upload-artifact@v4

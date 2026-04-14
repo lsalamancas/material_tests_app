@@ -29,6 +29,7 @@ wheels/
 # PyInstaller
 *.manifest
 *.spec
+!MaterialTestingAnalyzer.spec  # Incluir spec para GitHub Actions
 
 # IDE
 .vscode/
