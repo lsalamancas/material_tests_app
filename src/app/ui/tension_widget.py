@@ -107,7 +107,7 @@ class TensionWidget(QWidget):
         self._offset_spin = QDoubleSpinBox()
         self._offset_spin.setFont(QFont("Segoe UI", 9))
         self._offset_spin.setMinimum(0.01)
-        self._offset_spin.setMaximum(10.0)
+        self._offset_spin.setMaximum(2.0)  # Máximo realista en materiales
         self._offset_spin.setSingleStep(0.1)
         self._offset_spin.setValue(0.2)
         self._offset_spin.setFixedWidth(80)
