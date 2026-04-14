@@ -42,6 +42,7 @@ from app.parsers import tension_parser
 from app.parsers.tension_parser import TensionData, TensionSpecimen
 from app.analysis import tension_analysis
 from app.analysis.tension_analysis import TensionProperties
+from app.ui import plotly_exports
 
 COLORS = [
     "#1976D2", "#D32F2F", "#388E3C", "#F57C00", "#7B1FA2",
@@ -186,7 +187,20 @@ class TensionWidget(QWidget):
         # Barra inferior
         bottom = QHBoxLayout()
         bottom.addStretch()
-        self._download_btn = QPushButton("Descargar gráfico")
+        
+        self._download_html_btn = QPushButton("📊 Descargar HTML (interactivo)")
+        self._download_html_btn.setFont(QFont("Segoe UI", 10))
+        self._download_html_btn.setFixedHeight(36)
+        self._download_html_btn.setEnabled(False)
+        self._download_html_btn.setStyleSheet(
+            "QPushButton { background:#7B1FA2; color:white; border:none; border-radius:6px; padding:0 18px; }"
+            "QPushButton:hover { background:#6A1B9A; }"
+            "QPushButton:disabled { background:#BDBDBD; color:#757575; }"
+        )
+        self._download_html_btn.clicked.connect(self._on_download_html)
+        bottom.addWidget(self._download_html_btn)
+        
+        self._download_btn = QPushButton("🖼️ Descargar PNG")
         self._download_btn.setFont(QFont("Segoe UI", 10))
         self._download_btn.setFixedHeight(36)
         self._download_btn.setEnabled(False)
@@ -228,6 +242,7 @@ class TensionWidget(QWidget):
         self._refresh_plot()
         self._refresh_table()
         self._download_btn.setEnabled(True)
+        self._download_html_btn.setEnabled(True)
 
     def _on_offset_changed(self, value: int) -> None:
         """Recalcular propiedades cuando cambia el offset."""
@@ -269,11 +284,41 @@ class TensionWidget(QWidget):
 
     def _on_download(self) -> None:
         path, _ = QFileDialog.getSaveFileName(
-            self, "Guardar gráfico", "traccion.png",
+            self, "Guardar gráfico PNG", "traccion.png",
             "PNG (*.png);;PDF (*.pdf);;SVG (*.svg)"
         )
         if path:
             self._figure.savefig(path, dpi=150, bbox_inches="tight")
+
+    def _on_download_html(self) -> None:
+        """Descargar gráfico interactivo como HTML."""
+        if not self._data or not self._props:
+            QMessageBox.warning(self, "Sin datos", "Carga un archivo primero.")
+            return
+        
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Guardar gráfico HTML", "traccion.html",
+            "HTML (*.html)"
+        )
+        if not path:
+            return
+        
+        try:
+            indices = self._selected_indices()
+            if not indices:
+                indices = list(range(len(self._data.specimens)))
+            
+            # Crear gráfico interactivo
+            fig = plotly_exports.create_tension_plot(
+                self._data.specimens, self._props, indices,
+                COLORS, self._offset_pct
+            )
+            
+            # Guardar como HTML
+            fig.write_html(path)
+            QMessageBox.information(self, "Éxito", f"Gráfico guardado:\n{path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error al guardar HTML:\n{str(e)}")
 
     # ------------------------------------------------------------------ Helpers
     def _build_specimen_checkboxes(self) -> None:
