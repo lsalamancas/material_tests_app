@@ -1,17 +1,34 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = []
+datas = [
+    ('flexion.xlsx', '.'),
+    ('impacto.xlsx', '.'),
+    ('tension.xlsx', '.'),
+    ('src', 'src'),
+]
 binaries = []
-hiddenimports = []
+hiddenimports = [
+    'app',
+    'app.ui',
+    'app.analysis',
+    'app.parsers',
+    'numpy',
+    'pandas',
+    'matplotlib',
+    'scipy',
+    'openpyxl',
+    'plotly',
+    'plotly.graph_objects',
+    'narwhals',
+]
 
-# Recopilar todas las dependencias
+# Recopilar hooks adicionales
 for pkg in ['matplotlib', 'PyQt6', 'pandas', 'numpy', 'scipy', 'openpyxl', 'plotly']:
     try:
         tmp_ret = collect_all(pkg)
         datas += tmp_ret[0]
         binaries += tmp_ret[1]
-        hiddenimports += tmp_ret[2]
     except Exception:
         pass
 
