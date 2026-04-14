@@ -15,12 +15,14 @@ from matplotlib.figure import Figure
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QFileDialog,
     QHBoxLayout,
     QLabel,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
@@ -41,6 +43,12 @@ PLOT_OPTIONS = {
     "Módulo de flexión (MPa)": "flexural_modulus_MPa",
 }
 
+COLORS = [
+    "#1976D2", "#D32F2F", "#388E3C", "#F57C00", "#7B1FA2",
+    "#0097A7", "#C62828", "#558B2F", "#4527A0", "#00838F",
+    "#AD1457",
+]
+
 BAR_COLOR = "#388E3C"
 BAR_HOVER = "#81C784"
 
@@ -50,6 +58,7 @@ class FlexionWidget(QWidget):
         super().__init__(parent)
         self._data: FlexionData | None = None
         self._props: list[FlexionProperties] = []
+        self._checkboxes: list[QCheckBox] = []
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -90,7 +99,34 @@ class FlexionWidget(QWidget):
         top.addWidget(self._plot_combo)
         root.addLayout(top)
 
-        # Área central
+        # Selección de especímenes
+        self._spec_bar = QWidget()
+        spec_bar_layout = QHBoxLayout(self._spec_bar)
+        spec_bar_layout.setContentsMargins(0, 0, 0, 0)
+        spec_bar_layout.setSpacing(8)
+
+        self._all_cb = QCheckBox("Todos")
+        self._all_cb.setChecked(True)
+        self._all_cb.setFont(QFont("Segoe UI", 9))
+        self._all_cb.stateChanged.connect(self._on_all_toggled)
+        spec_bar_layout.addWidget(self._all_cb)
+
+        self._spec_scroll = QScrollArea()
+        self._spec_scroll.setWidgetResizable(True)
+        self._spec_scroll.setFixedHeight(38)
+        self._spec_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self._spec_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._spec_scroll.setStyleSheet("QScrollArea { border: none; }")
+
+        self._spec_container = QWidget()
+        self._spec_inner = QHBoxLayout(self._spec_container)
+        self._spec_inner.setContentsMargins(0, 0, 0, 0)
+        self._spec_inner.setSpacing(6)
+        self._spec_scroll.setWidget(self._spec_container)
+
+        spec_bar_layout.addWidget(self._spec_scroll)
+        self._spec_bar.setVisible(False)
+        root.addWidget(self._spec_bar)
         center = QHBoxLayout()
         center.setSpacing(12)
 
@@ -154,6 +190,7 @@ class FlexionWidget(QWidget):
         self._props = flexion_analysis.calculate_all(self._data.specimens)
         n = len(self._data.specimens)
         self._file_label.setText(f"{n} especímenes cargados")
+        self._build_specimen_checkboxes()
         self._refresh_plot()
         self._refresh_table()
         self._download_btn.setEnabled(True)
@@ -166,6 +203,45 @@ class FlexionWidget(QWidget):
         if path:
             self._figure.savefig(path, dpi=150, bbox_inches="tight")
 
+    def _on_all_toggled(self, state: int) -> None:
+        checked = state == Qt.CheckState.Checked.value
+        for cb in self._checkboxes:
+            cb.blockSignals(True)
+            cb.setChecked(checked)
+            cb.blockSignals(False)
+        self._refresh_plot()
+
+    def _on_specimen_toggled(self) -> None:
+        all_checked = all(cb.isChecked() for cb in self._checkboxes)
+        self._all_cb.blockSignals(True)
+        self._all_cb.setChecked(all_checked)
+        self._all_cb.blockSignals(False)
+        self._refresh_plot()
+
+    def _build_specimen_checkboxes(self) -> None:
+        # Limpiar
+        for cb in self._checkboxes:
+            cb.deleteLater()
+        self._checkboxes.clear()
+
+        if not self._data:
+            return
+
+        for i, sp in enumerate(self._data.specimens):
+            cb = QCheckBox(sp.name)
+            cb.setChecked(True)
+            cb.setFont(QFont("Segoe UI", 9))
+            color = COLORS[i % len(COLORS)]
+            cb.setStyleSheet(f"QCheckBox {{ color: {color}; font-weight: bold; }}")
+            cb.stateChanged.connect(self._on_specimen_toggled)
+            self._spec_inner.addWidget(cb)
+            self._checkboxes.append(cb)
+
+        self._spec_bar.setVisible(True)
+
+    def _selected_indices(self) -> list[int]:
+        return [i for i, cb in enumerate(self._checkboxes) if cb.isChecked()]
+
     def _refresh_plot(self) -> None:
         self._figure.clear()
         ax = self._figure.add_subplot(111)
@@ -177,8 +253,9 @@ class FlexionWidget(QWidget):
         label = self._plot_combo.currentText()
         attr  = PLOT_OPTIONS[label]
 
-        names  = [p.specimen_name for p in self._props]
-        values = [getattr(p, attr) for p in self._props]
+        indices = self._selected_indices()
+        names  = [self._props[i].specimen_name for i in indices]
+        values = [getattr(self._props[i], attr) for i in indices]
         valid  = [(n, v) for n, v in zip(names, values) if not np.isnan(v)]
 
         if not valid:
@@ -213,8 +290,10 @@ class FlexionWidget(QWidget):
         self._canvas.draw()
 
     def _refresh_table(self) -> None:
-        self._table.setRowCount(len(self._props))
-        for r, p in enumerate(self._props):
+        indices = self._selected_indices()
+        selected_props = [self._props[i] for i in indices]
+        self._table.setRowCount(len(selected_props))
+        for r, p in enumerate(selected_props):
             def fmt(v): return f"{v:.2f}" if not np.isnan(v) else "–"
             self._table.setItem(r, 0, QTableWidgetItem(p.specimen_name))
             for c, val in enumerate([p.flexural_strength_MPa,

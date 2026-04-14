@@ -18,12 +18,14 @@ from matplotlib.figure import Figure
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QFileDialog,
     QHBoxLayout,
     QLabel,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
@@ -41,6 +43,12 @@ PLOT_OPTIONS = {
     "Tenacidad (J/mm²)":        "toughness",
 }
 
+COLORS = [
+    "#1976D2", "#D32F2F", "#388E3C", "#F57C00", "#7B1FA2",
+    "#0097A7", "#C62828", "#558B2F", "#4527A0", "#00838F",
+    "#AD1457",
+]
+
 BAR_COLOR   = "#F57C00"
 MEAN_COLOR  = "#B71C1C"
 SIGMA_COLOR = "#EF9A9A"
@@ -51,6 +59,7 @@ class ImpactWidget(QWidget):
         super().__init__(parent)
         self._data: ImpactData | None = None
         self._summary: ImpactSummary | None = None
+        self._checkboxes: list[QCheckBox] = []
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -90,7 +99,34 @@ class ImpactWidget(QWidget):
         top.addWidget(self._plot_combo)
         root.addLayout(top)
 
-        # Área central
+        # Selección de especímenes
+        self._spec_bar = QWidget()
+        spec_bar_layout = QHBoxLayout(self._spec_bar)
+        spec_bar_layout.setContentsMargins(0, 0, 0, 0)
+        spec_bar_layout.setSpacing(8)
+
+        self._all_cb = QCheckBox("Todos")
+        self._all_cb.setChecked(True)
+        self._all_cb.setFont(QFont("Segoe UI", 9))
+        self._all_cb.stateChanged.connect(self._on_all_toggled)
+        spec_bar_layout.addWidget(self._all_cb)
+
+        self._spec_scroll = QScrollArea()
+        self._spec_scroll.setWidgetResizable(True)
+        self._spec_scroll.setFixedHeight(38)
+        self._spec_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self._spec_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._spec_scroll.setStyleSheet("QScrollArea { border: none; }")
+
+        self._spec_container = QWidget()
+        self._spec_inner = QHBoxLayout(self._spec_container)
+        self._spec_inner.setContentsMargins(0, 0, 0, 0)
+        self._spec_inner.setSpacing(6)
+        self._spec_scroll.setWidget(self._spec_container)
+
+        spec_bar_layout.addWidget(self._spec_scroll)
+        self._spec_bar.setVisible(False)
+        root.addWidget(self._spec_bar)
         center = QHBoxLayout()
         center.setSpacing(12)
 
@@ -174,6 +210,7 @@ class ImpactWidget(QWidget):
         self._file_label.setText(
             f"{n} especímenes · Norma: {self._data.standard}"
         )
+        self._build_specimen_checkboxes()
         self._refresh_plot()
         self._refresh_tables()
         self._download_btn.setEnabled(True)
@@ -185,6 +222,45 @@ class ImpactWidget(QWidget):
         )
         if path:
             self._figure.savefig(path, dpi=150, bbox_inches="tight")
+
+    def _on_all_toggled(self, state: int) -> None:
+        checked = state == Qt.CheckState.Checked.value
+        for cb in self._checkboxes:
+            cb.blockSignals(True)
+            cb.setChecked(checked)
+            cb.blockSignals(False)
+        self._refresh_plot()
+
+    def _on_specimen_toggled(self) -> None:
+        all_checked = all(cb.isChecked() for cb in self._checkboxes)
+        self._all_cb.blockSignals(True)
+        self._all_cb.setChecked(all_checked)
+        self._all_cb.blockSignals(False)
+        self._refresh_plot()
+
+    def _build_specimen_checkboxes(self) -> None:
+        # Limpiar
+        for cb in self._checkboxes:
+            cb.deleteLater()
+        self._checkboxes.clear()
+
+        if not self._data:
+            return
+
+        for i, sp in enumerate(self._data.specimens):
+            cb = QCheckBox(f"#{sp.number}")
+            cb.setChecked(True)
+            cb.setFont(QFont("Segoe UI", 9))
+            color = COLORS[i % len(COLORS)]
+            cb.setStyleSheet(f"QCheckBox {{ color: {color}; font-weight: bold; }}")
+            cb.stateChanged.connect(self._on_specimen_toggled)
+            self._spec_inner.addWidget(cb)
+            self._checkboxes.append(cb)
+
+        self._spec_bar.setVisible(True)
+
+    def _selected_indices(self) -> list[int]:
+        return [i for i, cb in enumerate(self._checkboxes) if cb.isChecked()]
 
     def _refresh_plot(self) -> None:
         self._figure.clear()
@@ -207,11 +283,12 @@ class ImpactWidget(QWidget):
             mean   = self._summary.mean_toughness
             std    = self._summary.std_toughness
 
-        labels = [f"#{s.number}" for s in self._data.specimens]
-        valid_mask = [not np.isnan(v) for v in values]
-        x_all = np.arange(len(labels))
-        x = x_all[valid_mask]
-        vals = np.array([v for v, m in zip(values, valid_mask) if m])
+        indices = self._selected_indices()
+        labels = [f"#{self._data.specimens[i].number}" for i in indices]
+        selected_values = [values[i] for i in indices]
+        valid_mask = [not np.isnan(v) for v in selected_values]
+        x = np.arange(len(indices))[valid_mask]
+        vals = np.array([v for v, m in zip(selected_values, valid_mask) if m])
 
         bars = ax.bar(x, vals, color=BAR_COLOR, edgecolor="white",
                       linewidth=0.5, width=0.7, zorder=3)
@@ -224,17 +301,19 @@ class ImpactWidget(QWidget):
                 ha="center", va="bottom", fontsize=8, color="#424242"
             )
 
-        # Línea de media y banda ±σ
-        if not np.isnan(mean) and len(x):
-            x_min, x_max = x[0] - 0.4, x[-1] + 0.4
-            ax.axhline(mean, color=MEAN_COLOR, linewidth=1.5,
-                       linestyle="--", label=f"Media = {mean:.3f}", zorder=4)
-            if not np.isnan(std):
-                ax.axhspan(mean - std, mean + std,
-                           alpha=0.15, color=SIGMA_COLOR,
-                           label=f"±σ = {std:.3f}", zorder=2)
+        # Línea de media y banda ±σ (calculadas solo con especímenes seleccionados)
+        if len(vals) > 0 and not np.all(np.isnan(vals)):
+            selected_mean = np.nanmean(vals)
+            selected_std = np.nanstd(vals, ddof=1) if len(vals) > 1 else np.nan
+            if len(x):
+                ax.axhline(selected_mean, color=MEAN_COLOR, linewidth=1.5,
+                           linestyle="--", label=f"Media = {selected_mean:.3f}", zorder=4)
+                if not np.isnan(selected_std):
+                    ax.axhspan(selected_mean - selected_std, selected_mean + selected_std,
+                               alpha=0.15, color=SIGMA_COLOR,
+                               label=f"±σ = {selected_std:.3f}", zorder=2)
 
-        ax.set_xticks(x_all)
+        ax.set_xticks(np.arange(len(labels)))
         ax.set_xticklabels(labels, fontsize=9)
         ax.set_xlabel("Espécimen", fontsize=11)
         ax.set_ylabel(ylabel, fontsize=11)
@@ -242,7 +321,8 @@ class ImpactWidget(QWidget):
                      fontsize=13, fontweight="bold")
         ax.grid(axis="y", alpha=0.3, zorder=0)
         ax.set_axisbelow(True)
-        ax.legend(fontsize=9)
+        if x.size > 0:
+            ax.legend(fontsize=9)
 
         self._figure.tight_layout()
         self._canvas.draw()
