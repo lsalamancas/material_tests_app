@@ -209,9 +209,122 @@ def _parse_xlsx(path: Path) -> TensionData:
     return data
 
 
-def _parse_csv(path: Path) -> TensionData:
-    """Fallback para CSV simple: columnas Time, Force, Stroke con especímenes en filas."""
-    sep = "\t" if path.suffix.lower() == ".txt" else ","
+_TIME_KEYWORDS = ("tiempo", "time")
+_FORCE_KEYWORDS = ("fuerza", "force")
+_DISP_KEYWORDS = ("desplazamiento", "despl", "disp", "stroke", "carrera", "elongac")
+
+
+def _classify_header(cell) -> str | None:
+    c = str(cell).strip().lower()
+    if any(k in c for k in _TIME_KEYWORDS):
+        return "time"
+    if any(k in c for k in _FORCE_KEYWORDS):
+        return "force"
+    if any(k in c for k in _DISP_KEYWORDS):
+        return "disp"
+    return None
+
+
+def _parse_csv_multi_curve(path: Path, sep: str) -> TensionData | None:
+    """
+    Formato de curvas crudas con varios especímenes en columnas paralelas
+    (p. ej. "Tiempo","Fuerza","Desplazamiento" repetido N veces), típico de
+    exportaciones directas del software del equipo de ensayo — sin la
+    sección de geometría/resumen que sí trae el .xlsx del formato principal.
+
+    Estructura esperada:
+      fila 0:       nombres de espécimen (uno por grupo, celdas vacías entre medio)
+      fila 1:       encabezados de columna (Tiempo/Fuerza/Desplazamiento × N)
+      fila 2:       unidades (opcional, se salta si no es numérica)
+      filas 3+:     datos; cada espécimen puede tener distinto número de filas
+                    (columnas sobrantes quedan vacías al final)
+
+    Como no hay geometría, cada TensionSpecimen queda con thickness_mm/
+    width_mm/gauge_length_mm en NaN — deben completarse manualmente
+    (la UI web lo pide) antes de poder calcular esfuerzo/deformación.
+
+    Devuelve None si el archivo no calza con este formato (para que el
+    llamador intente el fallback de espécimen único).
+    """
+    try:
+        raw = pd.read_csv(path, sep=sep, header=None, dtype=str, keep_default_na=False)
+    except Exception:
+        return None
+    if raw.shape[0] < 2 or raw.shape[1] < 2:
+        return None
+
+    header_row = None
+    for i in range(min(5, len(raw))):
+        types = [_classify_header(c) for c in raw.iloc[i]]
+        if types.count("time") >= 1 and types.count("force") >= 1:
+            header_row = i
+            break
+    if header_row is None:
+        return None
+
+    types = [_classify_header(c) for c in raw.iloc[header_row]]
+    title_row = raw.iloc[header_row - 1] if header_row > 0 else None
+
+    # Agrupar columnas: cada columna "time" abre un espécimen nuevo; las
+    # columnas "force"/"disp" siguientes se asignan a ese grupo.
+    groups: list[dict[str, int]] = []
+    current: dict[str, int] | None = None
+    for col, t in enumerate(types):
+        if t == "time":
+            current = {"time": col}
+            groups.append(current)
+        elif t in ("force", "disp") and current is not None:
+            current[t] = col
+
+    if len(groups) < 1 or not all("force" in g for g in groups):
+        return None
+    # Un único grupo sin fila de título distintiva es ambiguo con el
+    # formato simple de espécimen único — deja que ese fallback lo maneje.
+    if len(groups) == 1:
+        return None
+
+    data_start = header_row + 1
+    if data_start < len(raw):
+        try:
+            float(raw.iloc[data_start, groups[0]["time"]])
+        except (TypeError, ValueError):
+            data_start += 1  # saltar fila de unidades
+
+    numeric = raw.iloc[data_start:].apply(pd.to_numeric, errors="coerce")
+
+    data = TensionData()
+    for idx, g in enumerate(groups):
+        name = None
+        if title_row is not None:
+            label = str(title_row.iloc[g["time"]]).strip()
+            if label and label.lower() != "nan":
+                name = label
+        if not name:
+            name = f"Espécimen {idx + 1}"
+
+        cols = [c for c in (g.get("time"), g.get("force"), g.get("disp")) if c is not None]
+        chunk = numeric.iloc[:, cols].dropna()
+
+        sp = TensionSpecimen(
+            name=name,
+            thickness_mm=float("nan"),
+            width_mm=float("nan"),
+            gauge_length_mm=float("nan"),
+        )
+        if "time" in g:
+            sp.time_s = chunk[g["time"]].to_numpy()
+        if "force" in g:
+            sp.force_N = chunk[g["force"]].to_numpy()
+        if "disp" in g:
+            sp.stroke_mm = chunk[g["disp"]].to_numpy()
+
+        data.specimens.append(sp)
+
+    return data
+
+
+def _parse_csv_single(path: Path, sep: str) -> TensionData:
+    """Fallback para CSV simple: columnas Time, Force, Stroke con un solo espécimen."""
     df = pd.read_csv(path, sep=sep)
     df.columns = [c.strip() for c in df.columns]
 
@@ -222,9 +335,9 @@ def _parse_csv(path: Path) -> TensionData:
         width_mm=7.0,
         gauge_length_mm=30.99,
     )
-    force_col  = next((c for c in df.columns if "force" in c.lower() or c.upper() == "F"), None)
-    stroke_col = next((c for c in df.columns if "stroke" in c.lower() or "disp" in c.lower()), None)
-    time_col   = next((c for c in df.columns if "time" in c.lower()), None)
+    force_col  = next((c for c in df.columns if "force" in c.lower() or "fuerza" in c.lower() or c.upper() == "F"), None)
+    stroke_col = next((c for c in df.columns if "stroke" in c.lower() or "disp" in c.lower() or "desplaza" in c.lower()), None)
+    time_col   = next((c for c in df.columns if "time" in c.lower() or "tiempo" in c.lower()), None)
 
     if force_col:
         sp.force_N = pd.to_numeric(df[force_col], errors="coerce").dropna().to_numpy()
@@ -235,6 +348,14 @@ def _parse_csv(path: Path) -> TensionData:
 
     data.specimens = [sp]
     return data
+
+
+def _parse_csv(path: Path) -> TensionData:
+    sep = "\t" if path.suffix.lower() == ".txt" else ","
+    multi = _parse_csv_multi_curve(path, sep)
+    if multi is not None and multi.specimens:
+        return multi
+    return _parse_csv_single(path, sep)
 
 
 def parse(path: str | Path) -> TensionData:

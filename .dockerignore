@@ -1,0 +1,15 @@
+.git
+.github
+.venv
+venv
+__pycache__
+*.pyc
+paper/
+dist/
+build/
+*.spec
+!MaterialTestingAnalyzer.spec
+.pytest_cache
+.vscode
+.idea
+*.egg-info
