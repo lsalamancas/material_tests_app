@@ -53,13 +53,22 @@ def _agg(props: list, indices: list[int], attr: str) -> list[float]:
 
 # --------------------------------------------------------------------- Tracción
 def tension_tab() -> None:
-    st.subheader("Ensayo de tracción")
-    uploaded = st.file_uploader(
-        "Archivo de tracción (.xlsx del equipo, o .csv/.txt de curva cruda)",
-        type=["xlsx", "xls", "csv", "txt"], key="tension_file",
-    )
+    # Barra superior: cargar archivo | offset — igual que la barra
+    # load_btn + offset_slider del escritorio (tension_widget._build_ui).
+    top_l, top_r = st.columns([3, 2])
+    with top_l:
+        uploaded = st.file_uploader(
+            "Cargar archivo (.xlsx del equipo, o .csv/.txt de curva cruda)",
+            type=["xlsx", "xls", "csv", "txt"], key="tension_file", label_visibility="collapsed",
+        )
+    with top_r:
+        offset_pct = st.slider(
+            "Offset (σy)", min_value=0.01, max_value=2.0,
+            value=0.2, step=0.01, format="%.2f%%",
+        )
+
     if uploaded is None:
-        st.info("Carga un archivo para comenzar.")
+        st.info("Sin archivo cargado.")
         return
 
     path = _save_upload(uploaded)
@@ -105,62 +114,75 @@ def tension_tab() -> None:
             sp.width_mm = float(edited.loc[i, "Ancho (mm)"])
             sp.gauge_length_mm = float(edited.loc[i, "Long. calibrada (mm)"])
 
-    offset_pct = st.slider(
-        "Offset para límite elástico (σy)", min_value=0.01, max_value=2.0,
-        value=0.2, step=0.01, format="%.2f%%",
-    )
-
+    # Barra de especímenes — equivalente al "Todos" + checkboxes del escritorio.
     names = [sp.name for sp in data.specimens]
-    selected_names = st.multiselect("Especímenes", names, default=names, key="tension_specimens")
-    indices = [i for i, n in enumerate(names) if n in selected_names]
+    selected_names = st.multiselect("Especímenes", names, default=names, key="tension_specimens",
+                                     label_visibility="collapsed", placeholder="Especímenes")
 
+    indices = [i for i, n in enumerate(names) if n in selected_names]
     props = [tension_analysis.calculate(sp, offset_pct=offset_pct) for sp in data.specimens]
 
+    # Centro: gráfico | tabla de propiedades — mismo grid 3:2 que
+    # center.addWidget(canvas, stretch=3) / center.addLayout(right, stretch=2)
+    # en tension_widget.py.
+    col_plot, col_props = st.columns([3, 2])
+
+    fig = None
     if indices:
         fig = plotly_exports.create_tension_plot(data.specimens, props, indices, COLORS, offset_pct)
-        st.plotly_chart(fig, use_container_width=True)
+
+    with col_plot:
+        if fig is not None:
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Selecciona al menos un espécimen para graficar.")
+
+    with col_props:
+        st.markdown("**Propiedades mecánicas**")
+        if len(indices) == 1:
+            p = props[indices[0]]
+            rows = [
+                ("Espécimen", p.specimen_name),
+                ("Offset (σy)", f"{offset_pct:.2f} %"),
+                ("Módulo de Young (E)", _fmt(p.youngs_modulus_MPa, "MPa", 0)),
+                ("Límite proporcional", _fmt(p.proportional_limit_MPa, "MPa")),
+                ("Límite elástico (σy)", _fmt(p.yield_stress_MPa, "MPa")),
+                ("Deform. en σy", _fmt(p.yield_strain_pct, "%", 3)),
+                ("Resiliencia", _fmt(p.resilience_MJ_m3, "MJ/m³", 4)),
+                ("UTS", _fmt(p.uts_MPa, "MPa")),
+                ("Deform. en UTS", _fmt(p.uts_strain_pct, "%", 3)),
+                ("Esfuerzo de rotura", _fmt(p.break_stress_MPa, "MPa")),
+                ("Deform. de rotura", _fmt(p.break_strain_pct, "%", 3)),
+                ("Tenacidad", _fmt(p.toughness_MJ_m3, "MJ/m³", 3)),
+            ]
+            st.dataframe(pd.DataFrame(rows, columns=["Propiedad", "Valor"]),
+                         hide_index=True, use_container_width=True, height=422)
+        elif len(indices) > 1:
+            def _row(label: str, attr: str, unit: str, decimals: int = 2) -> tuple[str, str]:
+                vals = _agg(props, indices, attr)
+                if not vals:
+                    return (label, "–")
+                if len(vals) > 1:
+                    return (label, f"{np.mean(vals):.{decimals}f} ± {np.std(vals, ddof=1):.{decimals}f} {unit}")
+                return (label, f"{np.mean(vals):.{decimals}f} {unit}")
+
+            rows = [
+                ("Especímenes", str(len(indices))),
+                _row("E (prom. ± std)", "youngs_modulus_MPa", "MPa", 0),
+                _row("σy (prom. ± std)", "yield_stress_MPa", "MPa"),
+                _row("UTS (prom. ± std)", "uts_MPa", "MPa"),
+                _row("Resiliencia (prom.)", "resilience_MJ_m3", "MJ/m³", 4),
+                _row("Tenacidad (prom.)", "toughness_MJ_m3", "MJ/m³", 3),
+            ]
+            st.dataframe(pd.DataFrame(rows, columns=["Propiedad", "Valor"]),
+                         hide_index=True, use_container_width=True, height=422)
+
+    # Barra inferior — igual a los botones "Descargar HTML/PNG" del escritorio.
+    if fig is not None:
         st.download_button(
-            "📊 Descargar gráfico HTML interactivo",
+            "📊 Descargar gráfico HTML (interactivo)",
             data=fig.to_html(), file_name="traccion.html", mime="text/html",
         )
-    else:
-        st.info("Selecciona al menos un espécimen para graficar.")
-
-    st.markdown("#### Propiedades mecánicas")
-    if len(indices) == 1:
-        p = props[indices[0]]
-        rows = [
-            ("Espécimen", p.specimen_name),
-            ("Módulo de Young (E)", _fmt(p.youngs_modulus_MPa, "MPa", 0)),
-            ("Límite proporcional", _fmt(p.proportional_limit_MPa, "MPa")),
-            ("Límite elástico (σy)", _fmt(p.yield_stress_MPa, "MPa")),
-            ("Deform. en σy", _fmt(p.yield_strain_pct, "%", 3)),
-            ("Resiliencia", _fmt(p.resilience_MJ_m3, "MJ/m³", 4)),
-            ("UTS", _fmt(p.uts_MPa, "MPa")),
-            ("Deform. en UTS", _fmt(p.uts_strain_pct, "%", 3)),
-            ("Esfuerzo de rotura", _fmt(p.break_stress_MPa, "MPa")),
-            ("Deform. de rotura", _fmt(p.break_strain_pct, "%", 3)),
-            ("Tenacidad", _fmt(p.toughness_MJ_m3, "MJ/m³", 3)),
-        ]
-        st.table(pd.DataFrame(rows, columns=["Propiedad", "Valor"]))
-    elif len(indices) > 1:
-        def _row(label: str, attr: str, unit: str, decimals: int = 2) -> tuple[str, str]:
-            vals = _agg(props, indices, attr)
-            if not vals:
-                return (label, "–")
-            if len(vals) > 1:
-                return (label, f"{np.mean(vals):.{decimals}f} ± {np.std(vals, ddof=1):.{decimals}f} {unit}")
-            return (label, f"{np.mean(vals):.{decimals}f} {unit}")
-
-        rows = [
-            ("Especímenes", str(len(indices))),
-            _row("E (promedio ± std)", "youngs_modulus_MPa", "MPa", 0),
-            _row("σy (promedio ± std)", "yield_stress_MPa", "MPa"),
-            _row("UTS (promedio ± std)", "uts_MPa", "MPa"),
-            _row("Resiliencia (promedio)", "resilience_MJ_m3", "MJ/m³", 4),
-            _row("Tenacidad (promedio)", "toughness_MJ_m3", "MJ/m³", 3),
-        ]
-        st.table(pd.DataFrame(rows, columns=["Propiedad", "Valor"]))
 
     with st.expander("Ver todas las propiedades por espécimen"):
         full_df = pd.DataFrame([{
@@ -180,13 +202,24 @@ def tension_tab() -> None:
 
 # --------------------------------------------------------------------- Flexión
 def flexion_tab() -> None:
-    st.subheader("Ensayo de flexión (3 puntos)")
-    uploaded = st.file_uploader(
-        "Archivo de flexión (.xlsx del equipo, o .csv/.txt)",
-        type=["xlsx", "xls", "csv", "txt"], key="flexion_file",
-    )
+    attrs = {
+        "Resistencia a flexión (MPa)": "flexural_strength_MPa",
+        "Módulo de flexión (MPa)": "flexural_modulus_MPa",
+        "Deformación máxima (%)": "max_strain_pct",
+        "Fuerza máxima (N)": "max_force_N",
+    }
+
+    top_l, top_r = st.columns([3, 2])
+    with top_l:
+        uploaded = st.file_uploader(
+            "Cargar archivo (.xlsx del equipo, o .csv/.txt)",
+            type=["xlsx", "xls", "csv", "txt"], key="flexion_file", label_visibility="collapsed",
+        )
+    with top_r:
+        label = st.selectbox("Variable a graficar", list(attrs.keys()), key="flexion_attr")
+
     if uploaded is None:
-        st.info("Carga un archivo para comenzar.")
+        st.info("Sin archivo cargado.")
         return
 
     path = _save_upload(uploaded)
@@ -204,43 +237,47 @@ def flexion_tab() -> None:
 
     props = flexion_analysis.calculate_all(data.specimens)
     names = [p.specimen_name for p in props]
-    selected = st.multiselect("Especímenes", names, default=names, key="flexion_specimens")
+    selected = st.multiselect("Especímenes", names, default=names, key="flexion_specimens",
+                               label_visibility="collapsed", placeholder="Especímenes")
     indices = [i for i, n in enumerate(names) if n in selected]
 
-    attrs = {
-        "Resistencia a flexión (MPa)": "flexural_strength_MPa",
-        "Módulo de flexión (MPa)": "flexural_modulus_MPa",
-        "Deformación máxima (%)": "max_strain_pct",
-        "Fuerza máxima (N)": "max_force_N",
-    }
-    label = st.selectbox("Variable a graficar", list(attrs.keys()), key="flexion_attr")
+    # Mismo grid 3:2 (gráfico | tabla) que las demás pestañas.
+    col_plot, col_props = st.columns([3, 2])
 
-    if indices:
-        fig = plotly_exports.create_flexion_plot(props, indices, COLORS, attrs[label], label)
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("Selecciona al menos un espécimen para graficar.")
+    with col_plot:
+        if indices:
+            fig = plotly_exports.create_flexion_plot(props, indices, COLORS, attrs[label], label)
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Selecciona al menos un espécimen para graficar.")
 
-    df = pd.DataFrame([{
-        "Espécimen": p.specimen_name,
-        "Resistencia (MPa)": p.flexural_strength_MPa,
-        "Módulo (MPa)": p.flexural_modulus_MPa,
-        "Deform. máx (%)": p.max_strain_pct,
-        "Fuerza máx (N)": p.max_force_N,
-        "Desplaz. máx (mm)": p.max_disp_mm,
-    } for p in props])
-    st.dataframe(df, use_container_width=True)
+    with col_props:
+        st.markdown("**Propiedades mecánicas**")
+        df = pd.DataFrame([{
+            "Espécimen": p.specimen_name,
+            "Resistencia (MPa)": p.flexural_strength_MPa,
+            "Módulo (MPa)": p.flexural_modulus_MPa,
+            "Deform. máx (%)": p.max_strain_pct,
+            "Fuerza máx (N)": p.max_force_N,
+            "Desplaz. máx (mm)": p.max_disp_mm,
+        } for i, p in enumerate(props) if i in indices])
+        st.dataframe(df, hide_index=True, use_container_width=True, height=422)
 
 
 # --------------------------------------------------------------------- Impacto
 def impact_tab() -> None:
-    st.subheader("Ensayo de impacto (ASTM D256)")
-    uploaded = st.file_uploader(
-        "Archivo de impacto (.xlsx del equipo, o .csv/.txt)",
-        type=["xlsx", "xls", "csv", "txt"], key="impact_file",
-    )
+    top_l, top_r = st.columns([3, 2])
+    with top_l:
+        uploaded = st.file_uploader(
+            "Cargar archivo (.xlsx del equipo, o .csv/.txt)",
+            type=["xlsx", "xls", "csv", "txt"], key="impact_file", label_visibility="collapsed",
+        )
+    with top_r:
+        var_choice = st.radio("Variable", ["Energía absorbida", "Tenacidad"], horizontal=True, key="impact_var")
+    var_key = "energy" if var_choice == "Energía absorbida" else "toughness"
+
     if uploaded is None:
-        st.info("Carga un archivo para comenzar.")
+        st.info("Sin archivo cargado.")
         return
 
     path = _save_upload(uploaded)
@@ -257,30 +294,41 @@ def impact_tab() -> None:
         return
 
     summary = impact_analysis.summarize(data)
-    var_choice = st.radio("Variable", ["Energía absorbida", "Tenacidad"], horizontal=True, key="impact_var")
-    var_key = "energy" if var_choice == "Energía absorbida" else "toughness"
-
     indices = list(range(len(data.specimens)))
-    fig = plotly_exports.create_impact_plot(data.specimens, summary, indices, COLORS, var_key)
-    st.plotly_chart(fig, use_container_width=True)
 
-    col1, col2, col3, col4 = st.columns(4)
-    if var_key == "energy":
-        col1.metric("Media", _fmt(summary.mean_energy_J, "J"))
-        col2.metric("Desv. std", _fmt(summary.std_energy_J, "J"))
-        col3.metric("Mín", _fmt(summary.min_energy_J, "J"))
-        col4.metric("Máx", _fmt(summary.max_energy_J, "J"))
-    else:
-        col1.metric("Media", _fmt(summary.mean_toughness, "J/mm²", 4))
-        col2.metric("Desv. std", _fmt(summary.std_toughness, "J/mm²", 4))
-        col3.metric("Mín", _fmt(summary.min_toughness, "J/mm²", 4))
-        col4.metric("Máx", _fmt(summary.max_toughness, "J/mm²", 4))
+    col_plot, col_props = st.columns([3, 2])
 
-    df = pd.DataFrame([{
-        "N°": s.number, "Área (mm²)": s.area_mm2,
-        "Energía (J)": s.energy_J, "Tenacidad (J/mm²)": s.toughness_J_mm2,
-    } for s in data.specimens])
-    st.dataframe(df, use_container_width=True)
+    with col_plot:
+        fig = plotly_exports.create_impact_plot(data.specimens, summary, indices, COLORS, var_key)
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col_props:
+        st.markdown("**Estadísticas**")
+        if var_key == "energy":
+            rows = [
+                ("Media", _fmt(summary.mean_energy_J, "J")),
+                ("Desv. std", _fmt(summary.std_energy_J, "J")),
+                ("Mín", _fmt(summary.min_energy_J, "J")),
+                ("Máx", _fmt(summary.max_energy_J, "J")),
+                ("CV", _fmt(summary.cv_energy_pct, "%")),
+            ]
+        else:
+            rows = [
+                ("Media", _fmt(summary.mean_toughness, "J/mm²", 4)),
+                ("Desv. std", _fmt(summary.std_toughness, "J/mm²", 4)),
+                ("Mín", _fmt(summary.min_toughness, "J/mm²", 4)),
+                ("Máx", _fmt(summary.max_toughness, "J/mm²", 4)),
+                ("CV", _fmt(summary.cv_toughness_pct, "%")),
+            ]
+        st.dataframe(pd.DataFrame(rows, columns=["Propiedad", "Valor"]),
+                     hide_index=True, use_container_width=True, height=422)
+
+    with st.expander("Ver todos los especímenes"):
+        df = pd.DataFrame([{
+            "N°": s.number, "Área (mm²)": s.area_mm2,
+            "Energía (J)": s.energy_J, "Tenacidad (J/mm²)": s.toughness_J_mm2,
+        } for s in data.specimens])
+        st.dataframe(df, use_container_width=True, hide_index=True)
 
 
 def main() -> None:
