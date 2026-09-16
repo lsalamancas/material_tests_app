@@ -158,7 +158,7 @@ def _inject_css() -> None:
         rules.append(f"""
             .st-key-card_{t['id']} {{
                 background:
-                    linear-gradient(to top, {t['color']} 0%, {t['color']}F2 38%, {t['color']}A8 60%, {t['color']}55 100%),
+                    linear-gradient(to top, {t['color']}D9 0%, {t['color']}B3 38%, {t['color']}73 60%, {t['color']}33 100%),
                     url("{CARD_ART_URL[t['id']]}");
                 background-size: cover, cover;
                 background-position: center, center top;
@@ -181,7 +181,7 @@ def _inject_css() -> None:
                 font-size: 2.6rem !important; line-height: 1.15 !important;
             }}
             .st-key-card_{t['id']} button span[role="img"] {{
-                font-size: 2.2rem !important;
+                font-size: 2.6rem !important;
             }}
             .st-key-card_{t['id']} [data-testid="stCaptionContainer"] p {{
                 color: rgba(255,255,255,0.94) !important; font-size: 1.4rem !important; margin-top: 10px;
