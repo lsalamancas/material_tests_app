@@ -18,7 +18,7 @@ _SVG_TENSION = """
   <polygon points="80,0 75,10 85,10" fill="#1976D2"/>
   <text x="92" y="10" font-size="13" fill="#1976D2" font-family="sans-serif" font-weight="700">F</text>
 
-  <path d="M70,34 L70,70 Q70,80 60,90 L60,150 Q60,160 70,170 L70,206 L90,206 L90,170 Q100,160 100,150 L100,90 Q100,80 90,70 L90,34 Z" fill="none" stroke="#424242" stroke-width="2.5"/>
+  <path d="M60,34 L60,70 Q60,80 70,90 L70,150 Q70,160 60,170 L60,206 L100,206 L100,170 Q100,160 90,150 L90,90 Q90,80 100,70 L100,34 Z" fill="none" stroke="#424242" stroke-width="2.5"/>
 
   <line x1="40" y1="90" x2="40" y2="150" stroke="#9E9E9E" stroke-width="1.5"/>
   <line x1="35" y1="90" x2="45" y2="90" stroke="#9E9E9E" stroke-width="1.5"/>
