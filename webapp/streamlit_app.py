@@ -25,6 +25,8 @@ from app.parsers import flexion_parser, impact_parser, tension_parser  # noqa: E
 from app.analysis import flexion_analysis, impact_analysis, tension_analysis  # noqa: E402
 from app.ui import plotly_exports  # noqa: E402
 
+import education  # noqa: E402  (mismo directorio que este script)
+
 COLORS = [
     "#1976D2", "#D32F2F", "#388E3C", "#F57C00", "#7B1FA2",
     "#0097A7", "#C62828", "#558B2F", "#4527A0", "#00838F", "#AD1457",
@@ -214,6 +216,125 @@ def _agg(props: list, indices: list[int], attr: str) -> list[float]:
     return [getattr(props[i], attr) for i in indices if not np.isnan(getattr(props[i], attr))]
 
 
+def _manual_mapping_ui(path: Path, display_name: str) -> tension_parser.TensionData | None:
+    """
+    Fallback para formatos de tracción que ninguno de los parsers
+    conocidos (_parse_xlsx / _parse_csv_multi_curve / _parse_csv_single en
+    tension_parser.py) reconoce. En vez de intentar anticipar cada
+    máquina/software de laboratorio existente — un problema sin fondo,
+    cada uno exporta con su propio idioma de encabezados, separador,
+    decimal, unidades — se le pide al usuario, una sola vez por archivo,
+    que indique cómo leerlo: mismo patrón que el asistente de importación
+    de Excel/Google Sheets.
+
+    Soporta un espécimen por archivo (el caso típico de "una máquina nueva
+    exportó distinto"); el formato multi-espécimen en columnas paralelas ya
+    lo resuelve _parse_csv_multi_curve automáticamente.
+    """
+    st.warning(
+        "No reconocimos el formato de este archivo automáticamente. "
+        "Indícanos cómo leerlo (una sola vez):"
+    )
+    suffix = path.suffix.lower()
+
+    sep = dec = None
+    if suffix in (".csv", ".txt"):
+        c1, c2 = st.columns(2)
+        with c1:
+            sep_label = st.selectbox(
+                "Separador de columnas", ["Coma (,)", "Punto y coma (;)", "Tabulador"],
+                key="map_sep",
+            )
+        with c2:
+            dec_label = st.selectbox("Separador decimal", ["Punto (.)", "Coma (,)"], key="map_dec")
+        sep = {"Coma (,)": ",", "Punto y coma (;)": ";", "Tabulador": "\t"}[sep_label]
+        dec = "." if dec_label.startswith("Punto") else ","
+
+    c3, c4 = st.columns(2)
+    with c3:
+        header_row = st.number_input(
+            "Fila del encabezado (0 = primera fila)", min_value=0, max_value=20, value=0, key="map_header",
+        )
+    with c4:
+        has_units_row = st.checkbox("Hay una fila de unidades justo debajo del encabezado", key="map_units")
+
+    try:
+        if suffix in (".csv", ".txt"):
+            preview = pd.read_csv(path, sep=sep, decimal=dec, header=None, nrows=15, dtype=str)
+        else:
+            preview = pd.read_excel(path, sheet_name=0, header=None, nrows=15)
+    except Exception as exc:
+        st.error(f"No se pudo leer con esos parámetros: {exc}")
+        return None
+
+    st.caption("Vista previa del archivo (primeras filas):")
+    st.dataframe(preview, use_container_width=True, hide_index=True)
+
+    col_labels = [f"Columna {i}" for i in range(preview.shape[1])]
+    c5, c6, c7 = st.columns(3)
+    with c5:
+        time_col = st.selectbox("Columna de Tiempo", ["(ninguna)"] + col_labels, key="map_time")
+    with c6:
+        force_col = st.selectbox("Columna de Fuerza", ["(ninguna)"] + col_labels, key="map_force")
+    with c7:
+        disp_col = st.selectbox("Columna de Desplazamiento", ["(ninguna)"] + col_labels, key="map_disp")
+
+    name = st.text_input("Nombre del espécimen", value=display_name, key="map_name")
+
+    if force_col == "(ninguna)":
+        st.info("Selecciona al menos la columna de Fuerza para continuar.")
+        return None
+    if not st.button(":material/check: Usar esta configuración", key="map_confirm"):
+        return None
+
+    if suffix in (".csv", ".txt"):
+        # engine="python": el motor C por defecto de pandas no respeta el
+        # parámetro `decimal` en varios casos (columnas con texto mezclado,
+        # como aquí — verificado con pandas 3.0.2) y deja el separador
+        # decimal sin convertir, silenciosamente. El motor python sí lo hace.
+        full = pd.read_csv(path, sep=sep, decimal=dec, header=None, engine="python")
+    else:
+        full = pd.read_excel(path, sheet_name=0, header=None)
+
+    data_start = int(header_row) + 1 + (1 if has_units_row else 0)
+    numeric = full.iloc[data_start:].apply(pd.to_numeric, errors="coerce")
+
+    def _idx(label: str) -> int | None:
+        return None if label == "(ninguna)" else col_labels.index(label)
+
+    cols = [c for c in (_idx(time_col), _idx(force_col), _idx(disp_col)) if c is not None]
+    chunk = numeric.iloc[:, cols].dropna()
+
+    sp = tension_parser.TensionSpecimen(
+        name=name or display_name, thickness_mm=float("nan"), width_mm=float("nan"), gauge_length_mm=float("nan"),
+    )
+    if _idx(time_col) is not None:
+        sp.time_s = chunk[_idx(time_col)].to_numpy()
+    sp.force_N = chunk[_idx(force_col)].to_numpy()
+    if _idx(disp_col) is not None:
+        sp.stroke_mm = chunk[_idx(disp_col)].to_numpy()
+
+    if len(sp.force_N) < 2:
+        st.error("Con esa selección no quedaron suficientes filas numéricas. Revisa la fila de encabezado/unidades.")
+        return None
+
+    data = tension_parser.TensionData()
+    data.specimens = [sp]
+    return data
+
+
+def _load_tension_data(path: Path, display_name: str) -> tension_parser.TensionData | None:
+    try:
+        data = tension_parser.parse(path)
+        has_curve = any(len(sp.force_N) > 1 for sp in data.specimens)
+    except Exception:
+        has_curve = False
+
+    if has_curve:
+        return data
+    return _manual_mapping_ui(path, display_name)
+
+
 def _metric_row(items: list[tuple[str, str] | tuple[str, str, str]]) -> None:
     """Fila de KPIs (st.metric) — mismo dato que antes iba en una tabla
     angosta al lado de la gráfica; ahora la gráfica queda sola y grande,
@@ -230,10 +351,12 @@ def _metric_row(items: list[tuple[str, str] | tuple[str, str, str]]) -> None:
 
 # --------------------------------------------------------------------- Tracción
 def tension_tab() -> None:
+    education.render_tension_help()
+
     top_l, top_r = st.columns([3, 2])
     with top_l:
         uploaded = st.file_uploader(
-            "Cargar archivo (.xlsx del equipo, o .csv/.txt de curva cruda)",
+            "Cargar archivo (.xlsx del equipo, .csv/.txt de curva cruda, o cualquier otro formato)",
             type=["xlsx", "xls", "csv", "txt"], key="tension_file", label_visibility="collapsed",
         )
     with top_r:
@@ -248,13 +371,12 @@ def tension_tab() -> None:
 
     path = _save_upload(uploaded)
     try:
-        data = tension_parser.parse(path)
-    except Exception as exc:
-        st.error(f"No se pudo leer el archivo: {exc}")
-        return
+        data = _load_tension_data(path, Path(uploaded.name).stem)
     finally:
         path.unlink(missing_ok=True)
 
+    if data is None:
+        return
     if not data.specimens:
         st.warning("No se encontraron especímenes en el archivo.")
         return
@@ -354,6 +476,8 @@ def tension_tab() -> None:
 
 # --------------------------------------------------------------------- Flexión
 def flexion_tab() -> None:
+    education.render_flexion_help()
+
     attrs = {
         "Resistencia a flexión (MPa)": "flexural_strength_MPa",
         "Módulo de flexión (MPa)": "flexural_modulus_MPa",
@@ -420,6 +544,8 @@ def flexion_tab() -> None:
 
 # --------------------------------------------------------------------- Impacto
 def impact_tab() -> None:
+    education.render_impact_help()
+
     top_l, top_r = st.columns([3, 2])
     with top_l:
         uploaded = st.file_uploader(
