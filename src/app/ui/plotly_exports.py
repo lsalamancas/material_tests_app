@@ -40,17 +40,24 @@ def create_tension_plot(specimens: list, props: list, indices: list[int],
                 hovertemplate=f"{sp.name}<br>Deformación: %{{x:.3f}}%<br>Esfuerzo: %{{y:.2f}} MPa<extra></extra>"
             ))
             
-            # Módulo de Young (línea punteada)
+            # Módulo de Young (línea punteada). showlegend=False a propósito
+            # en las 4 series de abajo: con muchos especímenes seleccionados
+            # a la vez, una entrada de leyenda por cada línea E/offset/UTS/σy
+            # de cada curva (hasta 5x el número de especímenes) vuelve la
+            # leyenda ilegible y tapa la gráfica. El significado de cada
+            # símbolo se explica una sola vez en la anotación de abajo, igual
+            # que hace el matplotlib del escritorio (ax.text con el mismo texto).
             if props_i.elastic_strain_range is not None and len(props_i.elastic_strain_range) > 0:
                 fig.add_trace(go.Scatter(
                     x=props_i.elastic_strain_range,
                     y=props_i.elastic_stress_fit,
                     mode='lines',
                     name=f"{sp.name} (E)",
+                    showlegend=False,
                     line=dict(color=color, width=1.5, dash='dash'),
                     hovertemplate=f"Módulo E<br>Deformación: %{{x:.3f}}%<br>Esfuerzo: %{{y:.2f}} MPa<extra></extra>"
                 ))
-            
+
             # Línea offset
             if props_i.offset_strain_range is not None and len(props_i.offset_strain_range) > 0:
                 fig.add_trace(go.Scatter(
@@ -58,10 +65,11 @@ def create_tension_plot(specimens: list, props: list, indices: list[int],
                     y=props_i.offset_stress_line,
                     mode='lines',
                     name=f"{sp.name} (offset {offset_pct:.2f}%)",
+                    showlegend=False,
                     line=dict(color=color, width=1, dash='dot'),
                     hovertemplate=f"Offset {offset_pct:.2f}%<br>Deformación: %{{x:.3f}}%<br>Esfuerzo: %{{y:.2f}} MPa<extra></extra>"
                 ))
-            
+
             # Punto UTS
             if not np.isnan(props_i.uts_MPa):
                 fig.add_trace(go.Scatter(
@@ -69,10 +77,11 @@ def create_tension_plot(specimens: list, props: list, indices: list[int],
                     y=[props_i.uts_MPa],
                     mode='markers',
                     name=f"{sp.name} (UTS)",
+                    showlegend=False,
                     marker=dict(color=color, size=10, symbol='circle'),
                     hovertemplate=f"UTS: %{{y:.2f}} MPa @ %{{x:.3f}}%<extra></extra>"
                 ))
-            
+
             # Límite elástico 0.2%
             if not np.isnan(props_i.yield_stress_MPa):
                 fig.add_trace(go.Scatter(
@@ -80,6 +89,7 @@ def create_tension_plot(specimens: list, props: list, indices: list[int],
                     y=[props_i.yield_stress_MPa],
                     mode='markers',
                     name=f"{sp.name} (σy)",
+                    showlegend=False,
                     marker=dict(color=color, size=12, symbol='triangle-up'),
                     hovertemplate=f"σy: %{{y:.2f}} MPa @ %{{x:.3f}}%<extra></extra>"
                 ))
@@ -101,8 +111,8 @@ def create_tension_plot(specimens: list, props: list, indices: list[int],
         yaxis_title="Esfuerzo (MPa)",
         hovermode='x unified',
         template='plotly_white',
-        width=1200,
-        height=600,
+        autosize=True,
+        height=560,
         font=dict(family="Segoe UI, sans-serif", size=11),
         legend=dict(
             x=1.02, y=1,
@@ -112,12 +122,23 @@ def create_tension_plot(specimens: list, props: list, indices: list[int],
             bordercolor='#E0E0E0',
             borderwidth=1,
         ),
-        margin=dict(l=60, r=260, t=60, b=60)
+        margin=dict(l=60, r=180, t=60, b=60)
     )
-    
+
+    # Leyenda de símbolos — una sola vez para toda la gráfica (igual idea que
+    # la anotación de matplotlib en tension_widget._refresh_plot), en vez de
+    # una entrada de leyenda por cada línea/marcador de cada curva.
+    fig.add_annotation(
+        text="- - Módulo E&nbsp;&nbsp;&nbsp;···· Offset&nbsp;&nbsp;&nbsp;▲ σy&nbsp;&nbsp;&nbsp;● UTS",
+        xref="paper", yref="paper", x=0.01, y=0.99,
+        showarrow=False, align="left", font=dict(size=10, color="#616161"),
+        bgcolor="rgba(255,243,224,0.6)", bordercolor="#FFE0B2", borderwidth=1,
+        borderpad=4,
+    )
+
     fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
     fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
-    
+
     return fig
 
 
@@ -163,8 +184,8 @@ def create_impact_plot(specimens: list, summary, indices: list[int],
         xaxis_title="Espécimen",
         yaxis_title=ylabel,
         template='plotly_white',
-        width=1000,
-        height=600,
+        autosize=True,
+        height=480,
         font=dict(family="Segoe UI, sans-serif", size=11),
         hovermode='x',
         showlegend=False
@@ -204,8 +225,8 @@ def create_flexion_plot(props: list, indices: list[int],
         xaxis_title="Espécimen",
         yaxis_title=label,
         template='plotly_white',
-        width=1000,
-        height=600,
+        autosize=True,
+        height=480,
         font=dict(family="Segoe UI, sans-serif", size=11),
         hovermode='x',
         showlegend=False,

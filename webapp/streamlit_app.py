@@ -30,89 +30,125 @@ COLORS = [
     "#0097A7", "#C62828", "#558B2F", "#4527A0", "#00838F", "#AD1457",
 ]
 
-# Mismos datos que TEST_TYPES/HEADER_COLOR en
-# src/app/ui/home_screen.py y main_window.py — pantalla de inicio con
-# tarjetas + sidebar de navegación, calcado del shell de la app de escritorio.
+# Mismos datos/colores que TEST_TYPES en src/app/ui/home_screen.py — el
+# icono usa el shortcode nativo de Streamlit (":material/x:"), Material
+# Symbols de Google, en vez de emojis/unicode.
 TEST_TYPES = [
     {
-        "id": "tension", "label": "Tracción", "icon": "↗",
-        "subtitle": "Curva esfuerzo–deformación\nMódulo de Young · UTS · Límite elástico",
+        "id": "tension", "label": "Tracción", "icon": "trending_up",
+        "subtitle": "Curva esfuerzo–deformación · Módulo de Young · UTS · Límite elástico",
         "color": "#1976D2",
     },
     {
-        "id": "flexion", "label": "Flexión", "icon": "⌒",
-        "subtitle": "Ensayo 3 puntos\nMódulo de flexión · Resistencia máxima",
+        "id": "flexion", "label": "Flexión", "icon": "architecture",
+        "subtitle": "Ensayo 3 puntos · Módulo de flexión · Resistencia máxima",
         "color": "#388E3C",
     },
     {
-        "id": "impact", "label": "Impacto", "icon": "⚡",
-        "subtitle": "ASTM D256 (Charpy / Izod)\nEnergía absorbida · Tenacidad",
+        "id": "impact", "label": "Impacto", "icon": "bolt",
+        "subtitle": "ASTM D256 (Charpy / Izod) · Energía absorbida · Tenacidad",
         "color": "#F57C00",
     },
 ]
-NAV_ITEMS = [("home", "🏠", "Inicio")] + [(t["id"], t["icon"], t["label"]) for t in TEST_TYPES]
 LABEL_FOR_ID = {t["id"]: t["label"] for t in TEST_TYPES}
+ICON_FOR_ID = {t["id"]: t["icon"] for t in TEST_TYPES}
 COLOR_FOR_ID = {t["id"]: t["color"] for t in TEST_TYPES}
 
-st.set_page_config(page_title="Material Testing Analyzer", page_icon="📐", layout="wide")
+st.set_page_config(page_title="Material Testing Analyzer", page_icon="🧪", layout="wide")
 
 
 def _inject_css() -> None:
     """
-    CSS del shell — sidebar + tarjetas de inicio + barra superior de color.
-    Usa st.container(key=...), que Streamlit renderiza como
-    <div class="st-key-<key>"> — así se puede colorear cada tarjeta/botón
-    sin depender de selectores frágiles por posición.
+    Tipografía + shell (top bar / tarjetas de inicio). Usa
+    st.container(key=...), que Streamlit renderiza como
+    <div class="st-key-<key>"> — permite colorear cada pieza sin depender
+    de selectores frágiles por posición.
     """
     page = st.session_state.get("page", "home")
     rules = ["""
-        [data-testid="stSidebar"] { background-color: #F3F4F6; border-right: 1px solid #E5E7EB; }
-        [data-testid="stSidebar"] button {
-            background-color: transparent !important; color: #6B7280 !important;
-            border: none !important; text-align: left !important;
-            justify-content: flex-start !important; font-weight: 500 !important;
-            border-radius: 6px !important;
+        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+
+        html, body, [class*="st-key-"], .stMarkdown, .stButton, .stTextInput,
+        .stSelectbox, .stMultiSelect, .stSlider, .stRadio, .stDataFrame,
+        [data-testid="stMetricValue"], [data-testid="stMetricLabel"] {
+            font-family: 'Manrope', sans-serif !important;
         }
-        [data-testid="stSidebar"] button:hover { background-color: #E5E7EB !important; color: #6B7280 !important; }
-        .stMainBlockContainer { padding-top: 2rem; }
+        h1 { font-weight: 800 !important; letter-spacing: -0.02em; }
+        h1, h2, h3 { font-family: 'Manrope', sans-serif !important; }
+        p, label, span { font-size: 1rem; }
+        .stMainBlockContainer { padding-top: 1.5rem; max-width: 1400px; }
+
+        /* Top bar */
+        .st-key-topbar {
+            background: #FFFFFF; border-bottom: 1px solid #E5E7EB;
+            padding: 14px 8px 18px 8px; margin-bottom: 20px;
+        }
+        .st-key-logo button {
+            background: transparent !important; border: none !important; box-shadow: none !important;
+            color: #111827 !important; font-size: 1.25rem !important; font-weight: 800 !important;
+            justify-content: flex-start !important; padding: 0 !important;
+        }
+        .st-key-logo button:hover { color: #1976D2 !important; }
     """]
-    rules.append(f"""
-        .st-key-nav_{page} button {{
-            background-color: #DBEAFE !important; color: #2563EB !important;
-            border-left: 3px solid #2563EB !important; font-weight: 600 !important;
-        }}
-    """)
+
+    for pid in ["home"] + list(LABEL_FOR_ID.keys()):
+        accent = COLOR_FOR_ID.get(pid, "#1976D2")
+        text_color = "white" if pid == page else "#4B5563"
+        bg = (f"background:{accent} !important;border-color:{accent} !important;" if pid == page
+              else "background:#FFFFFF !important;")
+        # El color hay que aplicarlo también a los hijos del botón (el label
+        # de Streamlit va envuelto en div/p internos que si no, se quedan
+        # con su propio color por defecto y el texto/ícono se ve invisible
+        # sobre el fondo de color — mismo problema que las tarjetas de inicio.
+        rules.append(f"""
+            .st-key-navpill_{pid} button {{
+                border-radius: 999px !important; border: 1.5px solid #E5E7EB !important;
+                font-weight: 600 !important; padding: 6px 4px !important;
+                {bg}
+            }}
+            .st-key-navpill_{pid} button, .st-key-navpill_{pid} button * {{
+                color: {text_color} !important;
+            }}
+            .st-key-navpill_{pid} button:hover {{
+                border-color: {accent} !important;
+            }}
+            .st-key-navpill_{pid} button:hover, .st-key-navpill_{pid} button:hover * {{
+                color: {'white' if pid == page else accent} !important;
+            }}
+        """)
+
     for t in TEST_TYPES:
         rules.append(f"""
             .st-key-card_{t['id']} {{
-                background-color: {t['color']}; border-radius: 12px;
-                padding: 20px 28px 18px 28px; margin-bottom: 16px;
+                background: linear-gradient(135deg, {t['color']} 0%, {t['color']}CC 100%);
+                border-radius: 18px; padding: 28px 32px 26px 32px; margin-bottom: 18px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.06); transition: transform .15s ease, box-shadow .15s ease;
+            }}
+            .st-key-card_{t['id']}:hover {{
+                transform: translateY(-3px); box-shadow: 0 10px 24px rgba(0,0,0,0.14);
             }}
             .st-key-card_{t['id']} button {{
                 background: transparent !important; border: none !important; color: white !important;
-                font-size: 1.35rem !important; font-weight: 700 !important;
+                font-size: 1.5rem !important; font-weight: 800 !important;
                 justify-content: flex-start !important; padding: 0 !important; box-shadow: none !important;
                 width: 100%;
             }}
-            .st-key-card_{t['id']} button div,
-            .st-key-card_{t['id']} button p {{
+            .st-key-card_{t['id']} button div, .st-key-card_{t['id']} button p {{
                 text-align: left !important; justify-content: flex-start !important; width: 100%;
             }}
-            .st-key-card_{t['id']} button:hover {{ text-decoration: underline; }}
             .st-key-card_{t['id']} [data-testid="stCaptionContainer"] p {{
-                color: rgba(255,255,255,0.85) !important; white-space: pre-line;
+                color: rgba(255,255,255,0.9) !important; font-size: 0.95rem !important;
             }}
         """)
-    rules.append("""
-        .st-key-headerbar { border-radius: 8px; padding: 10px 16px; margin-bottom: 16px; }
-        .st-key-headerbar button {
-            background: transparent !important; color: white !important;
-            border: 1px solid rgba(255,255,255,0.6) !important; border-radius: 6px !important;
-        }
-        .st-key-headerbar button:hover { background: rgba(255,255,255,0.15) !important; }
-    """)
+
+    # Franja de acento (no una barra completa — el color ya vive en el pill
+    # activo de la top bar) sobre las pestañas de ensayo.
     if page in COLOR_FOR_ID:
-        rules.append(f".st-key-headerbar {{ background-color: {COLOR_FOR_ID[page]}; }}")
+        rules.append(f"""
+            .st-key-pageaccent {{ height: 4px; border-radius: 4px; margin-bottom: 18px;
+                background: {COLOR_FOR_ID[page]}; }}
+        """)
+
     st.markdown(f"<style>{''.join(rules)}</style>", unsafe_allow_html=True)
 
 
@@ -121,47 +157,43 @@ def _go(page_id: str) -> None:
     st.rerun()
 
 
-def _render_sidebar() -> None:
-    with st.sidebar:
-        for pid, icon, label in NAV_ITEMS:
-            with st.container(key=f"nav_{pid}"):
-                if st.button(f"{icon}  {label}", key=f"navbtn_{pid}", use_container_width=True):
-                    _go(pid)
+def _render_topbar() -> None:
+    with st.container(key="topbar"):
+        c_logo, c_gap, c_home, c_tension, c_flexion, c_impact = st.columns([4, 2, 1, 1.3, 1.2, 1.2])
+        with c_logo:
+            with st.container(key="logo"):
+                if st.button(":material/science: Material Testing Analyzer", key="logo_btn"):
+                    _go("home")
+        pills = [("home", "home", "Inicio"), *[(t["id"], t["icon"], t["label"]) for t in TEST_TYPES]]
+        for col, (pid, icon, label) in zip([c_home, c_tension, c_flexion, c_impact], pills):
+            with col:
+                with st.container(key=f"navpill_{pid}"):
+                    if st.button(f":material/{icon}: {label}", key=f"navbtn_{pid}", use_container_width=True):
+                        _go(pid)
 
 
 def _render_home() -> None:
     st.markdown(
         "<h1 style='text-align:center;margin-bottom:0;'>Análisis de Ensayos de Materiales</h1>"
-        "<p style='text-align:center;color:#757575;margin-top:4px;'>"
+        "<p style='text-align:center;color:#6B7280;font-size:1.1rem;margin-top:6px;'>"
         "Selecciona el tipo de ensayo para comenzar</p>",
         unsafe_allow_html=True,
     )
     st.write("")
-    for t in TEST_TYPES:
-        with st.container(key=f"card_{t['id']}"):
-            clicked = st.button(f"{t['icon']}  {t['label']}", key=f"cardbtn_{t['id']}", use_container_width=True)
-            st.caption(t["subtitle"])
-        if clicked:
-            _go(t["id"])
+    _, mid, _ = st.columns([1, 3, 1])
+    with mid:
+        for t in TEST_TYPES:
+            with st.container(key=f"card_{t['id']}"):
+                clicked = st.button(f":material/{t['icon']}: {t['label']}",
+                                     key=f"cardbtn_{t['id']}", use_container_width=True)
+                st.caption(t["subtitle"])
+            if clicked:
+                _go(t["id"])
     st.markdown(
-        "<p style='text-align:center;color:#BDBDBD;font-size:0.85rem;margin-top:24px;'>"
+        "<p style='text-align:center;color:#9CA3AF;font-size:0.85rem;margin-top:24px;'>"
         "Carga archivos .xlsx · .csv · .txt</p>",
         unsafe_allow_html=True,
     )
-
-
-def _render_header(page_id: str) -> None:
-    with st.container(key="headerbar"):
-        c_back, c_title = st.columns([1, 8])
-        with c_back:
-            if st.button("← Inicio", key="back_home_btn"):
-                _go("home")
-        with c_title:
-            st.markdown(
-                f"<div style='color:white;font-weight:700;font-size:1.05rem;"
-                f"padding-top:7px;'>Ensayo de {LABEL_FOR_ID[page_id]}</div>",
-                unsafe_allow_html=True,
-            )
 
 
 def _save_upload(uploaded) -> Path:
@@ -182,10 +214,22 @@ def _agg(props: list, indices: list[int], attr: str) -> list[float]:
     return [getattr(props[i], attr) for i in indices if not np.isnan(getattr(props[i], attr))]
 
 
+def _metric_row(items: list[tuple[str, str] | tuple[str, str, str]]) -> None:
+    """Fila de KPIs (st.metric) — mismo dato que antes iba en una tabla
+    angosta al lado de la gráfica; ahora la gráfica queda sola y grande,
+    y esto va debajo a modo de resumen rápido. Un tercer elemento opcional
+    (desv. std) va en el `delta` propio de st.metric — en su propia línea,
+    más chico — en vez de concatenarlo al string del valor, que se corta
+    con "…" cuando no cabe en la columna."""
+    cols = st.columns(len(items))
+    for col, item in zip(cols, items):
+        label, value = item[0], item[1]
+        delta = item[2] if len(item) > 2 else None
+        col.metric(label, value, delta=delta, delta_color="off")
+
+
 # --------------------------------------------------------------------- Tracción
 def tension_tab() -> None:
-    # Barra superior: cargar archivo | offset — igual que la barra
-    # load_btn + offset_slider del escritorio (tension_widget._build_ui).
     top_l, top_r = st.columns([3, 2])
     with top_l:
         uploaded = st.file_uploader(
@@ -194,7 +238,7 @@ def tension_tab() -> None:
         )
     with top_r:
         offset_pct = st.slider(
-            "Offset (σy)", min_value=0.01, max_value=2.0,
+            ":material/tune: Offset (σy)", min_value=0.01, max_value=2.0,
             value=0.2, step=0.01, format="%.2f%%",
         )
 
@@ -245,73 +289,50 @@ def tension_tab() -> None:
             sp.width_mm = float(edited.loc[i, "Ancho (mm)"])
             sp.gauge_length_mm = float(edited.loc[i, "Long. calibrada (mm)"])
 
-    # Barra de especímenes — equivalente al "Todos" + checkboxes del escritorio.
     names = [sp.name for sp in data.specimens]
     selected_names = st.multiselect("Especímenes", names, default=names, key="tension_specimens",
                                      label_visibility="collapsed", placeholder="Especímenes")
-
     indices = [i for i, n in enumerate(names) if n in selected_names]
     props = [tension_analysis.calculate(sp, offset_pct=offset_pct) for sp in data.specimens]
 
-    # Centro: gráfico | tabla de propiedades — mismo grid 3:2 que
-    # center.addWidget(canvas, stretch=3) / center.addLayout(right, stretch=2)
-    # en tension_widget.py.
-    col_plot, col_props = st.columns([3, 2])
-
+    # La gráfica sola, a todo el ancho — es lo importante, no compite por
+    # espacio con la tabla de propiedades.
     fig = None
     if indices:
         fig = plotly_exports.create_tension_plot(data.specimens, props, indices, COLORS, offset_pct)
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("Selecciona al menos un espécimen para graficar.")
 
-    with col_plot:
-        if fig is not None:
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("Selecciona al menos un espécimen para graficar.")
+    if len(indices) == 1:
+        p = props[indices[0]]
+        _metric_row([
+            ("Módulo de Young (E)", _fmt(p.youngs_modulus_MPa, "MPa", 0)),
+            ("Límite elástico (σy)", _fmt(p.yield_stress_MPa, "MPa")),
+            ("UTS", _fmt(p.uts_MPa, "MPa")),
+            ("Deform. de rotura", _fmt(p.break_strain_pct, "%", 2)),
+            ("Tenacidad", _fmt(p.toughness_MJ_m3, "MJ/m³", 3)),
+        ])
+    elif len(indices) > 1:
+        def _agg_fmt(attr: str, unit: str, decimals: int = 2) -> tuple[str, str | None]:
+            vals = _agg(props, indices, attr)
+            if not vals:
+                return "–", None
+            mean_str = f"{np.mean(vals):.{decimals}f} {unit}"
+            std_str = f"± {np.std(vals, ddof=1):.{decimals}f} {unit}" if len(vals) > 1 else None
+            return mean_str, std_str
 
-    with col_props:
-        st.markdown("**Propiedades mecánicas**")
-        if len(indices) == 1:
-            p = props[indices[0]]
-            rows = [
-                ("Espécimen", p.specimen_name),
-                ("Offset (σy)", f"{offset_pct:.2f} %"),
-                ("Módulo de Young (E)", _fmt(p.youngs_modulus_MPa, "MPa", 0)),
-                ("Límite proporcional", _fmt(p.proportional_limit_MPa, "MPa")),
-                ("Límite elástico (σy)", _fmt(p.yield_stress_MPa, "MPa")),
-                ("Deform. en σy", _fmt(p.yield_strain_pct, "%", 3)),
-                ("Resiliencia", _fmt(p.resilience_MJ_m3, "MJ/m³", 4)),
-                ("UTS", _fmt(p.uts_MPa, "MPa")),
-                ("Deform. en UTS", _fmt(p.uts_strain_pct, "%", 3)),
-                ("Esfuerzo de rotura", _fmt(p.break_stress_MPa, "MPa")),
-                ("Deform. de rotura", _fmt(p.break_strain_pct, "%", 3)),
-                ("Tenacidad", _fmt(p.toughness_MJ_m3, "MJ/m³", 3)),
-            ]
-            st.dataframe(pd.DataFrame(rows, columns=["Propiedad", "Valor"]),
-                         hide_index=True, use_container_width=True, height=422)
-        elif len(indices) > 1:
-            def _row(label: str, attr: str, unit: str, decimals: int = 2) -> tuple[str, str]:
-                vals = _agg(props, indices, attr)
-                if not vals:
-                    return (label, "–")
-                if len(vals) > 1:
-                    return (label, f"{np.mean(vals):.{decimals}f} ± {np.std(vals, ddof=1):.{decimals}f} {unit}")
-                return (label, f"{np.mean(vals):.{decimals}f} {unit}")
+        _metric_row([
+            ("Especímenes", str(len(indices))),
+            ("E (promedio)", *_agg_fmt("youngs_modulus_MPa", "MPa", 0)),
+            ("σy (promedio)", *_agg_fmt("yield_stress_MPa", "MPa", 1)),
+            ("UTS (promedio)", *_agg_fmt("uts_MPa", "MPa", 1)),
+            ("Tenacidad (prom.)", *_agg_fmt("toughness_MJ_m3", "MJ/m³", 1)),
+        ])
 
-            rows = [
-                ("Especímenes", str(len(indices))),
-                _row("E (prom. ± std)", "youngs_modulus_MPa", "MPa", 0),
-                _row("σy (prom. ± std)", "yield_stress_MPa", "MPa"),
-                _row("UTS (prom. ± std)", "uts_MPa", "MPa"),
-                _row("Resiliencia (prom.)", "resilience_MJ_m3", "MJ/m³", 4),
-                _row("Tenacidad (prom.)", "toughness_MJ_m3", "MJ/m³", 3),
-            ]
-            st.dataframe(pd.DataFrame(rows, columns=["Propiedad", "Valor"]),
-                         hide_index=True, use_container_width=True, height=422)
-
-    # Barra inferior — igual a los botones "Descargar HTML/PNG" del escritorio.
     if fig is not None:
         st.download_button(
-            "📊 Descargar gráfico HTML (interactivo)",
+            ":material/download: Descargar gráfico HTML (interactivo)",
             data=fig.to_html(), file_name="traccion.html", mime="text/html",
         )
 
@@ -328,7 +349,7 @@ def tension_tab() -> None:
             "Resiliencia (MJ/m³)": p.resilience_MJ_m3,
             "Tenacidad (MJ/m³)": p.toughness_MJ_m3,
         } for p in props])
-        st.dataframe(full_df, use_container_width=True)
+        st.dataframe(full_df, use_container_width=True, hide_index=True)
 
 
 # --------------------------------------------------------------------- Flexión
@@ -347,7 +368,7 @@ def flexion_tab() -> None:
             type=["xlsx", "xls", "csv", "txt"], key="flexion_file", label_visibility="collapsed",
         )
     with top_r:
-        label = st.selectbox("Variable a graficar", list(attrs.keys()), key="flexion_attr")
+        label = st.selectbox(":material/bar_chart: Variable a graficar", list(attrs.keys()), key="flexion_attr")
 
     if uploaded is None:
         st.info("Sin archivo cargado.")
@@ -372,18 +393,20 @@ def flexion_tab() -> None:
                                label_visibility="collapsed", placeholder="Especímenes")
     indices = [i for i, n in enumerate(names) if n in selected]
 
-    # Mismo grid 3:2 (gráfico | tabla) que las demás pestañas.
-    col_plot, col_props = st.columns([3, 2])
+    if indices:
+        fig = plotly_exports.create_flexion_plot(props, indices, COLORS, attrs[label], label)
+        st.plotly_chart(fig, use_container_width=True)
 
-    with col_plot:
-        if indices:
-            fig = plotly_exports.create_flexion_plot(props, indices, COLORS, attrs[label], label)
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("Selecciona al menos un espécimen para graficar.")
+        vals = [getattr(props[i], attrs[label]) for i in indices if not np.isnan(getattr(props[i], attrs[label]))]
+        cols = st.columns(4)
+        cols[0].metric("Especímenes", str(len(indices)))
+        cols[1].metric("Promedio", f"{np.mean(vals):.2f}" if vals else "–")
+        cols[2].metric("Desv. std", f"{np.std(vals, ddof=1):.2f}" if len(vals) > 1 else "–")
+        cols[3].metric("Máximo", f"{np.max(vals):.2f}" if vals else "–")
+    else:
+        st.info("Selecciona al menos un espécimen para graficar.")
 
-    with col_props:
-        st.markdown("**Propiedades mecánicas**")
+    with st.expander("Ver todas las propiedades por espécimen"):
         df = pd.DataFrame([{
             "Espécimen": p.specimen_name,
             "Resistencia (MPa)": p.flexural_strength_MPa,
@@ -391,8 +414,8 @@ def flexion_tab() -> None:
             "Deform. máx (%)": p.max_strain_pct,
             "Fuerza máx (N)": p.max_force_N,
             "Desplaz. máx (mm)": p.max_disp_mm,
-        } for i, p in enumerate(props) if i in indices])
-        st.dataframe(df, hide_index=True, use_container_width=True, height=422)
+        } for p in props])
+        st.dataframe(df, hide_index=True, use_container_width=True)
 
 
 # --------------------------------------------------------------------- Impacto
@@ -427,32 +450,25 @@ def impact_tab() -> None:
     summary = impact_analysis.summarize(data)
     indices = list(range(len(data.specimens)))
 
-    col_plot, col_props = st.columns([3, 2])
+    fig = plotly_exports.create_impact_plot(data.specimens, summary, indices, COLORS, var_key)
+    st.plotly_chart(fig, use_container_width=True)
 
-    with col_plot:
-        fig = plotly_exports.create_impact_plot(data.specimens, summary, indices, COLORS, var_key)
-        st.plotly_chart(fig, use_container_width=True)
-
-    with col_props:
-        st.markdown("**Estadísticas**")
-        if var_key == "energy":
-            rows = [
-                ("Media", _fmt(summary.mean_energy_J, "J")),
-                ("Desv. std", _fmt(summary.std_energy_J, "J")),
-                ("Mín", _fmt(summary.min_energy_J, "J")),
-                ("Máx", _fmt(summary.max_energy_J, "J")),
-                ("CV", _fmt(summary.cv_energy_pct, "%")),
-            ]
-        else:
-            rows = [
-                ("Media", _fmt(summary.mean_toughness, "J/mm²", 4)),
-                ("Desv. std", _fmt(summary.std_toughness, "J/mm²", 4)),
-                ("Mín", _fmt(summary.min_toughness, "J/mm²", 4)),
-                ("Máx", _fmt(summary.max_toughness, "J/mm²", 4)),
-                ("CV", _fmt(summary.cv_toughness_pct, "%")),
-            ]
-        st.dataframe(pd.DataFrame(rows, columns=["Propiedad", "Valor"]),
-                     hide_index=True, use_container_width=True, height=422)
+    if var_key == "energy":
+        _metric_row([
+            ("Media", _fmt(summary.mean_energy_J, "J")),
+            ("Desv. std", _fmt(summary.std_energy_J, "J")),
+            ("Mín", _fmt(summary.min_energy_J, "J")),
+            ("Máx", _fmt(summary.max_energy_J, "J")),
+            ("CV", _fmt(summary.cv_energy_pct, "%")),
+        ])
+    else:
+        _metric_row([
+            ("Media", _fmt(summary.mean_toughness, "J/mm²", 4)),
+            ("Desv. std", _fmt(summary.std_toughness, "J/mm²", 4)),
+            ("Mín", _fmt(summary.min_toughness, "J/mm²", 4)),
+            ("Máx", _fmt(summary.max_toughness, "J/mm²", 4)),
+            ("CV", _fmt(summary.cv_toughness_pct, "%")),
+        ])
 
     with st.expander("Ver todos los especímenes"):
         df = pd.DataFrame([{
@@ -468,13 +484,14 @@ TAB_FOR_ID = {"tension": tension_tab, "flexion": flexion_tab, "impact": impact_t
 def main() -> None:
     st.session_state.setdefault("page", "home")
     _inject_css()
-    _render_sidebar()
+    _render_topbar()
 
     page = st.session_state.page
     if page == "home":
         _render_home()
     else:
-        _render_header(page)
+        st.markdown(f"<div class='st-key-pageaccent'></div>", unsafe_allow_html=True)
+        st.markdown(f"### :material/{ICON_FOR_ID[page]}: Ensayo de {LABEL_FOR_ID[page]}")
         TAB_FOR_ID[page]()
 
 
