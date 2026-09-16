@@ -1,0 +1,14 @@
+# Fuerza el tema claro de la app de escritorio (LIGHT_STYLESHEET en
+# src/app/ui/styles.py) en vez de seguir el tema oscuro/claro del sistema
+# del visitante — la app de escritorio no sigue el tema del SO tampoco,
+# arranca siempre en claro con un toggle propio.
+[theme]
+base = "light"
+primaryColor = "#1976D2"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F5F5F5"
+textColor = "#212121"
+font = "sans serif"
+
+[browser]
+gatherUsageStats = false

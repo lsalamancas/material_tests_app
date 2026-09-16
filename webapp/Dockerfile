@@ -15,6 +15,9 @@ RUN pip install --no-cache-dir -r webapp/requirements.txt
 # sistema (Xorg, Qt, etc.), a diferencia del ejecutable de escritorio.
 COPY src ./src
 COPY webapp ./webapp
+# Tema claro forzado (ver comentario en el archivo) — Streamlit lo busca en
+# <CWD>/.streamlit/config.toml, y CWD aquí es /app (WORKDIR), no webapp/.
+COPY .streamlit ./.streamlit
 
 ENV PYTHONUNBUFFERED=1 \
     STREAMLIT_BASE_PATH=materialtestapp

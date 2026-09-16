@@ -30,7 +30,138 @@ COLORS = [
     "#0097A7", "#C62828", "#558B2F", "#4527A0", "#00838F", "#AD1457",
 ]
 
+# Mismos datos que TEST_TYPES/HEADER_COLOR en
+# src/app/ui/home_screen.py y main_window.py — pantalla de inicio con
+# tarjetas + sidebar de navegación, calcado del shell de la app de escritorio.
+TEST_TYPES = [
+    {
+        "id": "tension", "label": "Tracción", "icon": "↗",
+        "subtitle": "Curva esfuerzo–deformación\nMódulo de Young · UTS · Límite elástico",
+        "color": "#1976D2",
+    },
+    {
+        "id": "flexion", "label": "Flexión", "icon": "⌒",
+        "subtitle": "Ensayo 3 puntos\nMódulo de flexión · Resistencia máxima",
+        "color": "#388E3C",
+    },
+    {
+        "id": "impact", "label": "Impacto", "icon": "⚡",
+        "subtitle": "ASTM D256 (Charpy / Izod)\nEnergía absorbida · Tenacidad",
+        "color": "#F57C00",
+    },
+]
+NAV_ITEMS = [("home", "🏠", "Inicio")] + [(t["id"], t["icon"], t["label"]) for t in TEST_TYPES]
+LABEL_FOR_ID = {t["id"]: t["label"] for t in TEST_TYPES}
+COLOR_FOR_ID = {t["id"]: t["color"] for t in TEST_TYPES}
+
 st.set_page_config(page_title="Material Testing Analyzer", page_icon="📐", layout="wide")
+
+
+def _inject_css() -> None:
+    """
+    CSS del shell — sidebar + tarjetas de inicio + barra superior de color.
+    Usa st.container(key=...), que Streamlit renderiza como
+    <div class="st-key-<key>"> — así se puede colorear cada tarjeta/botón
+    sin depender de selectores frágiles por posición.
+    """
+    page = st.session_state.get("page", "home")
+    rules = ["""
+        [data-testid="stSidebar"] { background-color: #F3F4F6; border-right: 1px solid #E5E7EB; }
+        [data-testid="stSidebar"] button {
+            background-color: transparent !important; color: #6B7280 !important;
+            border: none !important; text-align: left !important;
+            justify-content: flex-start !important; font-weight: 500 !important;
+            border-radius: 6px !important;
+        }
+        [data-testid="stSidebar"] button:hover { background-color: #E5E7EB !important; color: #6B7280 !important; }
+        .stMainBlockContainer { padding-top: 2rem; }
+    """]
+    rules.append(f"""
+        .st-key-nav_{page} button {{
+            background-color: #DBEAFE !important; color: #2563EB !important;
+            border-left: 3px solid #2563EB !important; font-weight: 600 !important;
+        }}
+    """)
+    for t in TEST_TYPES:
+        rules.append(f"""
+            .st-key-card_{t['id']} {{
+                background-color: {t['color']}; border-radius: 12px;
+                padding: 20px 28px 18px 28px; margin-bottom: 16px;
+            }}
+            .st-key-card_{t['id']} button {{
+                background: transparent !important; border: none !important; color: white !important;
+                font-size: 1.35rem !important; font-weight: 700 !important;
+                justify-content: flex-start !important; padding: 0 !important; box-shadow: none !important;
+                width: 100%;
+            }}
+            .st-key-card_{t['id']} button div,
+            .st-key-card_{t['id']} button p {{
+                text-align: left !important; justify-content: flex-start !important; width: 100%;
+            }}
+            .st-key-card_{t['id']} button:hover {{ text-decoration: underline; }}
+            .st-key-card_{t['id']} [data-testid="stCaptionContainer"] p {{
+                color: rgba(255,255,255,0.85) !important; white-space: pre-line;
+            }}
+        """)
+    rules.append("""
+        .st-key-headerbar { border-radius: 8px; padding: 10px 16px; margin-bottom: 16px; }
+        .st-key-headerbar button {
+            background: transparent !important; color: white !important;
+            border: 1px solid rgba(255,255,255,0.6) !important; border-radius: 6px !important;
+        }
+        .st-key-headerbar button:hover { background: rgba(255,255,255,0.15) !important; }
+    """)
+    if page in COLOR_FOR_ID:
+        rules.append(f".st-key-headerbar {{ background-color: {COLOR_FOR_ID[page]}; }}")
+    st.markdown(f"<style>{''.join(rules)}</style>", unsafe_allow_html=True)
+
+
+def _go(page_id: str) -> None:
+    st.session_state.page = page_id
+    st.rerun()
+
+
+def _render_sidebar() -> None:
+    with st.sidebar:
+        for pid, icon, label in NAV_ITEMS:
+            with st.container(key=f"nav_{pid}"):
+                if st.button(f"{icon}  {label}", key=f"navbtn_{pid}", use_container_width=True):
+                    _go(pid)
+
+
+def _render_home() -> None:
+    st.markdown(
+        "<h1 style='text-align:center;margin-bottom:0;'>Análisis de Ensayos de Materiales</h1>"
+        "<p style='text-align:center;color:#757575;margin-top:4px;'>"
+        "Selecciona el tipo de ensayo para comenzar</p>",
+        unsafe_allow_html=True,
+    )
+    st.write("")
+    for t in TEST_TYPES:
+        with st.container(key=f"card_{t['id']}"):
+            clicked = st.button(f"{t['icon']}  {t['label']}", key=f"cardbtn_{t['id']}", use_container_width=True)
+            st.caption(t["subtitle"])
+        if clicked:
+            _go(t["id"])
+    st.markdown(
+        "<p style='text-align:center;color:#BDBDBD;font-size:0.85rem;margin-top:24px;'>"
+        "Carga archivos .xlsx · .csv · .txt</p>",
+        unsafe_allow_html=True,
+    )
+
+
+def _render_header(page_id: str) -> None:
+    with st.container(key="headerbar"):
+        c_back, c_title = st.columns([1, 8])
+        with c_back:
+            if st.button("← Inicio", key="back_home_btn"):
+                _go("home")
+        with c_title:
+            st.markdown(
+                f"<div style='color:white;font-weight:700;font-size:1.05rem;"
+                f"padding-top:7px;'>Ensayo de {LABEL_FOR_ID[page_id]}</div>",
+                unsafe_allow_html=True,
+            )
 
 
 def _save_upload(uploaded) -> Path:
@@ -331,17 +462,20 @@ def impact_tab() -> None:
         st.dataframe(df, use_container_width=True, hide_index=True)
 
 
-def main() -> None:
-    st.title("📐 Material Testing Analyzer")
-    st.caption("Análisis de ensayos de tracción, flexión e impacto")
+TAB_FOR_ID = {"tension": tension_tab, "flexion": flexion_tab, "impact": impact_tab}
 
-    tabs = st.tabs(["Tracción", "Flexión", "Impacto"])
-    with tabs[0]:
-        tension_tab()
-    with tabs[1]:
-        flexion_tab()
-    with tabs[2]:
-        impact_tab()
+
+def main() -> None:
+    st.session_state.setdefault("page", "home")
+    _inject_css()
+    _render_sidebar()
+
+    page = st.session_state.page
+    if page == "home":
+        _render_home()
+    else:
+        _render_header(page)
+        TAB_FOR_ID[page]()
 
 
 main()
