@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import sys
 import tempfile
-import urllib.parse
 from pathlib import Path
 
 import numpy as np
@@ -57,46 +56,18 @@ LABEL_FOR_ID = {t["id"]: t["label"] for t in TEST_TYPES}
 ICON_FOR_ID = {t["id"]: t["icon"] for t in TEST_TYPES}
 COLOR_FOR_ID = {t["id"]: t["color"] for t in TEST_TYPES}
 
-# Ilustraciones de fondo de cada tarjeta de inicio — misma idea que el hero
-# de bustral (landing_page/src/components/HeroSection.astro): una imagen
-# relacionada al contenido, semi-cubierta por un degradado del color de
-# marca para que el texto encima siga siendo legible. Como no hay fotos
-# reales del laboratorio para usar (y no vamos a salir a buscar fotos de
-# stock con derechos inciertos), son la misma geometría de los diagramas
-# de education.py, recoloreada en blanco translúcido, puestas de fondo vía
-# CSS en vez de como <img> — nada de branding de bustral, solo la técnica
-# visual (foto/ilustración + gradiente).
-_CARD_ART = {
-    "tension": """
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 240">
-          <rect x="55" y="10" width="50" height="24" rx="4" fill="white"/>
-          <path d="M70,34 L70,70 Q70,80 60,90 L60,150 Q60,160 70,170 L70,206 L90,206 L90,170 Q100,160 100,150 L100,90 Q100,80 90,70 L90,34 Z" fill="none" stroke="white" stroke-width="5"/>
-          <rect x="55" y="206" width="50" height="24" rx="4" fill="white"/>
-        </svg>
-    """,
-    "flexion": """
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 140">
-          <rect x="30" y="70" width="180" height="14" rx="3" fill="none" stroke="white" stroke-width="5"/>
-          <polygon points="50,84 38,106 62,106" fill="white"/>
-          <polygon points="190,84 178,106 202,106" fill="white"/>
-          <line x1="120" y1="36" x2="120" y2="66" stroke="white" stroke-width="6"/>
-          <polygon points="120,66 112,52 128,52" fill="white"/>
-        </svg>
-    """,
-    "impact": """
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220">
-          <circle cx="110" cy="20" r="7" fill="white"/>
-          <path d="M40,20 A70,70 0 0 1 170,150" fill="none" stroke="white" stroke-width="3" stroke-dasharray="6 5" opacity="0.6"/>
-          <line x1="110" y1="20" x2="110" y2="150" stroke="white" stroke-width="7"/>
-          <circle cx="110" cy="160" r="20" fill="white"/>
-          <rect x="70" y="188" width="80" height="12" rx="2" fill="none" stroke="white" stroke-width="5"/>
-        </svg>
-    """,
+# Fotos de fondo de cada tarjeta de inicio — mismo tratamiento que el hero
+# de bustral (landing_page/src/components/HeroSection.astro): foto +
+# degradado del color de marca encima para que el texto siga legible.
+# Generadas (no son fotos de stock con licencia incierta), servidas desde
+# webapp/static/ vía server.enableStaticServing (.streamlit/config.toml) en
+# la URL app/static/<archivo> — evita incrustar ~1MB de base64 por imagen
+# directo en el CSS.
+CARD_ART_URL = {
+    "tension": "app/static/card_tension.jpeg",
+    "flexion": "app/static/card_flexion.jpeg",
+    "impact": "app/static/card_impact.jpeg",
 }
-
-
-def _svg_data_uri(svg: str) -> str:
-    return "data:image/svg+xml," + urllib.parse.quote(svg.strip())
 
 
 st.set_page_config(page_title="Fertechnologies · Material Testing Analyzer", page_icon="🧪", layout="wide")
@@ -173,18 +144,17 @@ def _inject_css() -> None:
         # Tarjeta = degradado del color de marca + la ilustración del
         # ensayo asomando por la derecha, mismo tratamiento que el hero de
         # bustral (foto + gradient-to-r para que el texto de la izquierda
-        # quede legible) — ver el comentario en _CARD_ART más arriba.
-        art_uri = _svg_data_uri(_CARD_ART[t["id"]])
+        # quede legible) — ver el comentario en CARD_ART_URL más arriba.
         rules.append(f"""
             .st-key-card_{t['id']} {{
                 background:
-                    linear-gradient(to top, {t['color']}55 0%, {t['color']}A0 42%, {t['color']}F0 60%, {t['color']} 100%),
-                    url("{art_uri}");
-                background-size: cover, contain;
-                background-position: center, center bottom;
+                    linear-gradient(to top, {t['color']}55 0%, {t['color']}A8 40%, {t['color']}F2 62%, {t['color']} 100%),
+                    url("{CARD_ART_URL[t['id']]}");
+                background-size: cover, cover;
+                background-position: center, center;
                 background-repeat: no-repeat, no-repeat;
                 border-radius: 20px; padding: 32px 36px 30px 36px; margin-bottom: 20px;
-                min-height: 180px; display: flex; flex-direction: column; justify-content: center;
+                min-height: 220px; display: flex; flex-direction: column; justify-content: center;
                 box-shadow: 0 2px 10px rgba(0,0,0,0.06); transition: transform .15s ease, box-shadow .15s ease;
             }}
             .st-key-card_{t['id']}:hover {{

@@ -13,6 +13,13 @@ font = "sans serif"
 [browser]
 gatherUsageStats = false
 
+# Sirve webapp/static/ en la URL app/static/... — así las imágenes de
+# fondo de las tarjetas de inicio se referencian con una ruta relativa
+# normal en el CSS en vez de incrustarlas en base64 (~1MB de CSS por
+# imagen de más).
+[server]
+enableStaticServing = true
+
 # "minimal" oculta el botón "Deploy" y el menú de tres puntos (rerun,
 # limpiar caché, "About", etc.) — son opciones de desarrollo de Streamlit
 # que no aplican a los usuarios finales de esta app.
