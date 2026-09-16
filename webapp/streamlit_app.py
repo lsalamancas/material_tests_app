@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import sys
 import tempfile
+import urllib.parse
 from pathlib import Path
 
 import numpy as np
@@ -56,6 +57,48 @@ LABEL_FOR_ID = {t["id"]: t["label"] for t in TEST_TYPES}
 ICON_FOR_ID = {t["id"]: t["icon"] for t in TEST_TYPES}
 COLOR_FOR_ID = {t["id"]: t["color"] for t in TEST_TYPES}
 
+# Ilustraciones de fondo de cada tarjeta de inicio — misma idea que el hero
+# de bustral (landing_page/src/components/HeroSection.astro): una imagen
+# relacionada al contenido, semi-cubierta por un degradado del color de
+# marca para que el texto encima siga siendo legible. Como no hay fotos
+# reales del laboratorio para usar (y no vamos a salir a buscar fotos de
+# stock con derechos inciertos), son la misma geometría de los diagramas
+# de education.py, recoloreada en blanco translúcido, puestas de fondo vía
+# CSS en vez de como <img> — nada de branding de bustral, solo la técnica
+# visual (foto/ilustración + gradiente).
+_CARD_ART = {
+    "tension": """
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 240">
+          <rect x="55" y="10" width="50" height="24" rx="4" fill="white"/>
+          <path d="M70,34 L70,70 Q70,80 60,90 L60,150 Q60,160 70,170 L70,206 L90,206 L90,170 Q100,160 100,150 L100,90 Q100,80 90,70 L90,34 Z" fill="none" stroke="white" stroke-width="5"/>
+          <rect x="55" y="206" width="50" height="24" rx="4" fill="white"/>
+        </svg>
+    """,
+    "flexion": """
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 140">
+          <rect x="30" y="70" width="180" height="14" rx="3" fill="none" stroke="white" stroke-width="5"/>
+          <polygon points="50,84 38,106 62,106" fill="white"/>
+          <polygon points="190,84 178,106 202,106" fill="white"/>
+          <line x1="120" y1="36" x2="120" y2="66" stroke="white" stroke-width="6"/>
+          <polygon points="120,66 112,52 128,52" fill="white"/>
+        </svg>
+    """,
+    "impact": """
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220">
+          <circle cx="110" cy="20" r="7" fill="white"/>
+          <path d="M40,20 A70,70 0 0 1 170,150" fill="none" stroke="white" stroke-width="3" stroke-dasharray="6 5" opacity="0.6"/>
+          <line x1="110" y1="20" x2="110" y2="150" stroke="white" stroke-width="7"/>
+          <circle cx="110" cy="160" r="20" fill="white"/>
+          <rect x="70" y="188" width="80" height="12" rx="2" fill="none" stroke="white" stroke-width="5"/>
+        </svg>
+    """,
+}
+
+
+def _svg_data_uri(svg: str) -> str:
+    return "data:image/svg+xml," + urllib.parse.quote(svg.strip())
+
+
 st.set_page_config(page_title="Fertechnologies · Material Testing Analyzer", page_icon="🧪", layout="wide")
 
 
@@ -70,24 +113,31 @@ def _inject_css() -> None:
     rules = ["""
         @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
 
+        /* Sube el tamaño base — de esto heredan (via rem) casi todos los
+           textos e inputs de Streamlit, así que un solo cambio escala toda
+           la app en vez de ir componente por componente. */
+        html { font-size: 18px; }
+
         html, body, [class*="st-key-"], .stMarkdown, .stButton, .stTextInput,
         .stSelectbox, .stMultiSelect, .stSlider, .stRadio, .stDataFrame,
         [data-testid="stMetricValue"], [data-testid="stMetricLabel"] {
             font-family: 'Manrope', sans-serif !important;
         }
-        h1 { font-weight: 800 !important; letter-spacing: -0.02em; }
+        h1 { font-weight: 800 !important; letter-spacing: -0.02em; font-size: 2.75rem !important; }
         h1, h2, h3 { font-family: 'Manrope', sans-serif !important; }
+        h3 { font-size: 1.6rem !important; }
         p, label, span { font-size: 1rem; }
+        [data-testid="stCaptionContainer"] p { font-size: 0.95rem !important; }
         .stMainBlockContainer { padding-top: 1.5rem; max-width: 1400px; }
 
         /* Top bar */
         .st-key-topbar {
             background: #FFFFFF; border-bottom: 1px solid #E5E7EB;
-            padding: 14px 8px 18px 8px; margin-bottom: 20px;
+            padding: 16px 8px 20px 8px; margin-bottom: 24px;
         }
         .st-key-logo button {
             background: transparent !important; border: none !important; box-shadow: none !important;
-            color: #111827 !important; font-size: 1.25rem !important; font-weight: 800 !important;
+            color: #111827 !important; font-size: 1.5rem !important; font-weight: 800 !important;
             justify-content: flex-start !important; padding: 0 !important;
         }
         .st-key-logo button:hover { color: #1976D2 !important; }
@@ -105,7 +155,7 @@ def _inject_css() -> None:
         rules.append(f"""
             .st-key-navpill_{pid} button {{
                 border-radius: 999px !important; border: 1.5px solid #E5E7EB !important;
-                font-weight: 600 !important; padding: 6px 4px !important;
+                font-weight: 600 !important; font-size: 1.05rem !important; padding: 10px 6px !important;
                 {bg}
             }}
             .st-key-navpill_{pid} button, .st-key-navpill_{pid} button * {{
@@ -120,18 +170,29 @@ def _inject_css() -> None:
         """)
 
     for t in TEST_TYPES:
+        # Tarjeta = degradado del color de marca + la ilustración del
+        # ensayo asomando por la derecha, mismo tratamiento que el hero de
+        # bustral (foto + gradient-to-r para que el texto de la izquierda
+        # quede legible) — ver el comentario en _CARD_ART más arriba.
+        art_uri = _svg_data_uri(_CARD_ART[t["id"]])
         rules.append(f"""
             .st-key-card_{t['id']} {{
-                background: linear-gradient(135deg, {t['color']} 0%, {t['color']}CC 100%);
-                border-radius: 18px; padding: 28px 32px 26px 32px; margin-bottom: 18px;
+                background:
+                    linear-gradient(100deg, {t['color']} 22%, {t['color']}F0 40%, {t['color']}A0 58%, {t['color']}55 100%),
+                    url("{art_uri}");
+                background-size: cover, contain;
+                background-position: center, right center;
+                background-repeat: no-repeat, no-repeat;
+                border-radius: 20px; padding: 32px 36px 30px 36px; margin-bottom: 20px;
+                min-height: 180px; display: flex; flex-direction: column; justify-content: center;
                 box-shadow: 0 2px 10px rgba(0,0,0,0.06); transition: transform .15s ease, box-shadow .15s ease;
             }}
             .st-key-card_{t['id']}:hover {{
-                transform: translateY(-3px); box-shadow: 0 10px 24px rgba(0,0,0,0.14);
+                transform: translateY(-3px); box-shadow: 0 12px 28px rgba(0,0,0,0.16);
             }}
             .st-key-card_{t['id']} button {{
                 background: transparent !important; border: none !important; color: white !important;
-                font-size: 1.5rem !important; font-weight: 800 !important;
+                font-size: 1.75rem !important; font-weight: 800 !important;
                 justify-content: flex-start !important; padding: 0 !important; box-shadow: none !important;
                 width: 100%;
             }}
@@ -139,7 +200,7 @@ def _inject_css() -> None:
                 text-align: left !important; justify-content: flex-start !important; width: 100%;
             }}
             .st-key-card_{t['id']} [data-testid="stCaptionContainer"] p {{
-                color: rgba(255,255,255,0.9) !important; font-size: 0.95rem !important;
+                color: rgba(255,255,255,0.92) !important; font-size: 1.05rem !important; margin-top: 4px;
             }}
         """)
 
