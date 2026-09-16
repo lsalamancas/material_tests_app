@@ -101,14 +101,23 @@ def _inject_css() -> None:
         [data-testid="stCaptionContainer"] p { font-size: 0.95rem !important; }
         .stMainBlockContainer { padding-top: 1.5rem; max-width: 1400px; }
 
-        /* Top bar */
+        /* Top bar — dock estilo macOS: flotante, angosto, translúcido con
+           blur, bordes completamente redondos. No ocupa el ancho completo
+           del contenedor (max-width + margin:auto lo centra). */
         .st-key-topbar {
-            background: #FFFFFF; border-bottom: 1px solid #E5E7EB;
-            padding: 16px 8px 20px 8px; margin-bottom: 24px;
+            background: rgba(255,255,255,0.65);
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid rgba(255,255,255,0.6);
+            border-radius: 999px;
+            padding: 10px 28px;
+            margin: 4px auto 32px auto;
+            max-width: 1180px;
+            box-shadow: 0 8px 32px rgba(17,24,39,0.10), 0 1px 3px rgba(17,24,39,0.06);
         }
         .st-key-logo button {
             background: transparent !important; border: none !important; box-shadow: none !important;
-            color: #111827 !important; font-size: 1.5rem !important; font-weight: 800 !important;
+            color: #111827 !important; font-size: 1.4rem !important; font-weight: 800 !important;
             justify-content: flex-start !important; padding: 0 !important;
         }
         .st-key-logo button:hover { color: #1976D2 !important; }
@@ -116,24 +125,25 @@ def _inject_css() -> None:
 
     for pid in ["home"] + list(LABEL_FOR_ID.keys()):
         accent = COLOR_FOR_ID.get(pid, "#1976D2")
-        text_color = "white" if pid == page else "#4B5563"
-        bg = (f"background:{accent} !important;border-color:{accent} !important;" if pid == page
-              else "background:#FFFFFF !important;")
+        text_color = "white" if pid == page else "#374151"
+        bg = f"background:{accent} !important;box-shadow:0 4px 14px {accent}66 !important;" if pid == page else "background:transparent !important;"
         # El color hay que aplicarlo también a los hijos del botón (el label
         # de Streamlit va envuelto en div/p internos que si no, se quedan
         # con su propio color por defecto y el texto/ícono se ve invisible
         # sobre el fondo de color — mismo problema que las tarjetas de inicio.
         rules.append(f"""
             .st-key-navpill_{pid} button {{
-                border-radius: 999px !important; border: 1.5px solid #E5E7EB !important;
-                font-weight: 600 !important; font-size: 1.05rem !important; padding: 10px 6px !important;
+                border-radius: 999px !important; border: none !important;
+                font-weight: 700 !important; font-size: 1.15rem !important; padding: 16px 8px !important;
+                transition: background .15s ease, transform .1s ease;
                 {bg}
             }}
             .st-key-navpill_{pid} button, .st-key-navpill_{pid} button * {{
                 color: {text_color} !important;
             }}
             .st-key-navpill_{pid} button:hover {{
-                border-color: {accent} !important;
+                background: {accent if pid == page else 'rgba(17,24,39,0.06)'} !important;
+                transform: translateY(-1px);
             }}
             .st-key-navpill_{pid} button:hover, .st-key-navpill_{pid} button:hover * {{
                 color: {'white' if pid == page else accent} !important;
@@ -148,13 +158,13 @@ def _inject_css() -> None:
         rules.append(f"""
             .st-key-card_{t['id']} {{
                 background:
-                    linear-gradient(to top, {t['color']}55 0%, {t['color']}A8 40%, {t['color']}F2 62%, {t['color']} 100%),
+                    linear-gradient(to top, {t['color']} 0%, {t['color']}F2 38%, {t['color']}A8 60%, {t['color']}55 100%),
                     url("{CARD_ART_URL[t['id']]}");
                 background-size: cover, cover;
-                background-position: center, center;
+                background-position: center, center top;
                 background-repeat: no-repeat, no-repeat;
-                border-radius: 20px; padding: 32px 36px 30px 36px; margin-bottom: 20px;
-                min-height: 220px; display: flex; flex-direction: column; justify-content: center;
+                border-radius: 20px; padding: 30px 36px 34px 36px; margin-bottom: 20px;
+                min-height: 220px; display: flex; flex-direction: column; justify-content: flex-end;
                 box-shadow: 0 2px 10px rgba(0,0,0,0.06); transition: transform .15s ease, box-shadow .15s ease;
             }}
             .st-key-card_{t['id']}:hover {{
@@ -192,7 +202,7 @@ def _go(page_id: str) -> None:
 
 def _render_topbar() -> None:
     with st.container(key="topbar"):
-        c_logo, c_gap, c_home, c_tension, c_flexion, c_impact = st.columns([4, 2, 1, 1.3, 1.2, 1.2])
+        c_logo, c_home, c_tension, c_flexion, c_impact = st.columns([2.4, 1, 1.5, 1.4, 1.4])
         with c_logo:
             with st.container(key="logo"):
                 if st.button(":material/science: Material Testing Analyzer", key="logo_btn"):
@@ -207,12 +217,10 @@ def _render_topbar() -> None:
 
 def _render_home() -> None:
     st.markdown(
-        "<h1 style='text-align:center;margin-bottom:0;'>Análisis de Ensayos de Materiales</h1>"
-        "<p style='text-align:center;color:#6B7280;font-size:1.1rem;margin-top:6px;'>"
-        "Selecciona el tipo de ensayo para comenzar</p>",
+        "<p style='text-align:center;color:#374151;font-size:1.4rem;font-weight:700;margin:8px 0 28px 0;'>"
+        "Selecciona un ensayo para comenzar</p>",
         unsafe_allow_html=True,
     )
-    st.write("")
     _, mid, _ = st.columns([1, 3, 1])
     with mid:
         for t in TEST_TYPES:
