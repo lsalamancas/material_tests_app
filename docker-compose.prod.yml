@@ -1,8 +1,9 @@
 services:
-  # Versión web (Streamlit) del analizador. Sirve bajo
-  # fertechnologies.com/materialtestapp, en la misma red Traefik que ya
-  # enruta el resto de sitios en este servidor Hetzner (mismo patrón que
-  # app_bustral/docker-compose.prod.yml).
+  # Versión web (Streamlit) del analizador. Sirve en su propio subdominio
+  # materials-app.fertechnologies.com, con un Traefik dedicado en este mismo
+  # servidor (no comparte instancia con la landing de fertechnologies.com,
+  # que vive en otro servidor) — por eso es Host() puro, sin PathPrefix ni
+  # necesidad de coordinar prioridad con otro router.
   #
   # image: se construye en CI (.github/workflows/deploy-web.yml) y se
   # publica en GHCR — este servidor nunca compila nada, solo hace
@@ -14,27 +15,14 @@ services:
       dockerfile: webapp/Dockerfile
     container_name: material-testapp-web
     restart: unless-stopped
-    environment:
-      STREAMLIT_BASE_PATH: materialtestapp
     networks:
       - traefik_proxy
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik_proxy"
-      # PathPrefix (no subdominio) porque va colgado de la landing existente
-      # de fertechnologies.com. Streamlit ya genera todas sus rutas
-      # (assets, websocket) con el prefijo /materialtestapp incluido
-      # (--server.baseUrlPath, ver webapp/Dockerfile) — por eso NO se usa
-      # un middleware stripprefix aquí: si se le quitara el prefijo antes
-      # de llegar al contenedor, Streamlit dejaría de encontrar sus propias
-      # rutas y la UI cargaría en blanco.
-      - "traefik.http.routers.materialtestapp.rule=Host(`fertechnologies.com`) && PathPrefix(`/materialtestapp`)"
+      - "traefik.http.routers.materialtestapp.rule=Host(`materials-app.fertechnologies.com`)"
       - "traefik.http.routers.materialtestapp.entrypoints=websecure"
       - "traefik.http.routers.materialtestapp.tls.certresolver=myresolver"
-      # Prioridad explícita por encima del router "todo lo demás" de la
-      # landing de fertechnologies.com (mismo motivo que
-      # bustral-backend-login etc. en app_bustral/docker-compose.prod.yml).
-      - "traefik.http.routers.materialtestapp.priority=200"
       - "traefik.http.services.materialtestapp.loadbalancer.server.port=8501"
 
 networks:

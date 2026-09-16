@@ -19,21 +19,20 @@ COPY webapp ./webapp
 # <CWD>/.streamlit/config.toml, y CWD aquí es /app (WORKDIR), no webapp/.
 COPY .streamlit ./.streamlit
 
-ENV PYTHONUNBUFFERED=1 \
-    STREAMLIT_BASE_PATH=materialtestapp
+ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8501
 
+# Sirve en la raíz — la app vive en su propio subdominio
+# (materials-app.fertechnologies.com), no bajo un path compartido con otro
+# sitio, así que no hace falta --server.baseUrlPath.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD python -c "import urllib.request,os; urllib.request.urlopen(f'http://localhost:8501/{os.environ[\"STREAMLIT_BASE_PATH\"]}/_stcore/health').read()" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health').read()" || exit 1
 
-# Shell form (no exec-form array) a propósito: necesitamos que $STREAMLIT_BASE_PATH
-# se expanda en tiempo de arranque para que docker-compose pueda sobreescribirlo.
-CMD streamlit run webapp/streamlit_app.py \
-    --server.address=0.0.0.0 \
-    --server.port=8501 \
-    --server.baseUrlPath=$STREAMLIT_BASE_PATH \
-    --server.headless=true \
-    --server.enableCORS=false \
-    --server.enableXsrfProtection=false \
-    --browser.gatherUsageStats=false
+CMD ["streamlit", "run", "webapp/streamlit_app.py", \
+    "--server.address=0.0.0.0", \
+    "--server.port=8501", \
+    "--server.headless=true", \
+    "--server.enableCORS=false", \
+    "--server.enableXsrfProtection=false", \
+    "--browser.gatherUsageStats=false"]
