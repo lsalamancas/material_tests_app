@@ -178,10 +178,10 @@ def _inject_css() -> None:
         rules.append(f"""
             .st-key-card_{t['id']} {{
                 background:
-                    linear-gradient(100deg, {t['color']} 22%, {t['color']}F0 40%, {t['color']}A0 58%, {t['color']}55 100%),
+                    linear-gradient(to top, {t['color']}55 0%, {t['color']}A0 42%, {t['color']}F0 60%, {t['color']} 100%),
                     url("{art_uri}");
                 background-size: cover, contain;
-                background-position: center, right center;
+                background-position: center, center bottom;
                 background-repeat: no-repeat, no-repeat;
                 border-radius: 20px; padding: 32px 36px 30px 36px; margin-bottom: 20px;
                 min-height: 180px; display: flex; flex-direction: column; justify-content: center;
