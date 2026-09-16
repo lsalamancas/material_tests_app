@@ -54,7 +54,7 @@ LABEL_FOR_ID = {t["id"]: t["label"] for t in TEST_TYPES}
 ICON_FOR_ID = {t["id"]: t["icon"] for t in TEST_TYPES}
 COLOR_FOR_ID = {t["id"]: t["color"] for t in TEST_TYPES}
 
-st.set_page_config(page_title="Material Testing Analyzer", page_icon="🧪", layout="wide")
+st.set_page_config(page_title="Fertechnologies · Material Testing Analyzer", page_icon="🧪", layout="wide")
 
 
 def _inject_css() -> None:

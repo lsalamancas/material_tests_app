@@ -10,6 +10,16 @@ WORKDIR /app
 COPY webapp/requirements.txt ./webapp/requirements.txt
 RUN pip install --no-cache-dir -r webapp/requirements.txt
 
+# El HTML base que sirve Streamlit (index.html, empaquetado dentro del
+# propio paquete) trae hardcodeado <title>Streamlit</title> — eso es lo que
+# se ve en la pestaña una fracción de segundo antes de que el JS del app
+# arranque y lo reemplace por el page_title real (st.set_page_config, en
+# streamlit_app.py). Se parchea acá para que nunca se vea "Streamlit" ni
+# de refilón. Resuelve la ruta vía Python (no un path hardcodeado) para no
+# depender de la versión exacta de Python/Streamlit de la imagen.
+RUN python -c "import streamlit, os; print(os.path.join(os.path.dirname(streamlit.__file__), 'static', 'index.html'))" \
+    | xargs -I{} sed -i 's#<title>Streamlit</title>#<title>Fertechnologies · Material Testing Analyzer</title>#' {}
+
 # Solo src/ (parsers/analysis/plotly_exports, sin PyQt6) y webapp/ — nunca
 # se instala PyQt6 aquí, la imagen no tiene ni necesita libs gráficas de
 # sistema (Xorg, Qt, etc.), a diferencia del ejecutable de escritorio.

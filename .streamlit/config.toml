@@ -12,3 +12,9 @@ font = "sans serif"
 
 [browser]
 gatherUsageStats = false
+
+# "minimal" oculta el botón "Deploy" y el menú de tres puntos (rerun,
+# limpiar caché, "About", etc.) — son opciones de desarrollo de Streamlit
+# que no aplican a los usuarios finales de esta app.
+[client]
+toolbarMode = "minimal"
