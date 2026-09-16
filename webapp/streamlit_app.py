@@ -163,8 +163,8 @@ def _inject_css() -> None:
                 background-size: cover, cover;
                 background-position: center, center top;
                 background-repeat: no-repeat, no-repeat;
-                border-radius: 20px; padding: 30px 36px 34px 36px; margin-bottom: 20px;
-                min-height: 220px; display: flex; flex-direction: column; justify-content: flex-end;
+                border-radius: 24px; padding: 36px 44px 40px 44px; margin-bottom: 24px;
+                min-height: 280px; display: flex; flex-direction: column; justify-content: flex-end;
                 box-shadow: 0 2px 10px rgba(0,0,0,0.06); transition: transform .15s ease, box-shadow .15s ease;
             }}
             .st-key-card_{t['id']}:hover {{
@@ -172,15 +172,20 @@ def _inject_css() -> None:
             }}
             .st-key-card_{t['id']} button {{
                 background: transparent !important; border: none !important; color: white !important;
-                font-size: 1.75rem !important; font-weight: 800 !important;
+                font-size: 2.6rem !important; font-weight: 800 !important; line-height: 1.15 !important;
                 justify-content: flex-start !important; padding: 0 !important; box-shadow: none !important;
                 width: 100%;
             }}
             .st-key-card_{t['id']} button div, .st-key-card_{t['id']} button p {{
                 text-align: left !important; justify-content: flex-start !important; width: 100%;
+                font-size: 2.6rem !important; line-height: 1.15 !important;
+            }}
+            .st-key-card_{t['id']} button span[role="img"] {{
+                font-size: 2.2rem !important;
             }}
             .st-key-card_{t['id']} [data-testid="stCaptionContainer"] p {{
-                color: rgba(255,255,255,0.92) !important; font-size: 1.05rem !important; margin-top: 4px;
+                color: rgba(255,255,255,0.94) !important; font-size: 1.4rem !important; margin-top: 10px;
+                line-height: 1.4 !important;
             }}
         """)
 
@@ -221,15 +226,13 @@ def _render_home() -> None:
         "Selecciona un ensayo para comenzar</p>",
         unsafe_allow_html=True,
     )
-    _, mid, _ = st.columns([1, 3, 1])
-    with mid:
-        for t in TEST_TYPES:
-            with st.container(key=f"card_{t['id']}"):
-                clicked = st.button(f":material/{t['icon']}: {t['label']}",
-                                     key=f"cardbtn_{t['id']}", use_container_width=True)
-                st.caption(t["subtitle"])
-            if clicked:
-                _go(t["id"])
+    for t in TEST_TYPES:
+        with st.container(key=f"card_{t['id']}"):
+            clicked = st.button(f":material/{t['icon']}: {t['label']}",
+                                 key=f"cardbtn_{t['id']}", use_container_width=True)
+            st.caption(t["subtitle"])
+        if clicked:
+            _go(t["id"])
     st.markdown(
         "<p style='text-align:center;color:#9CA3AF;font-size:0.85rem;margin-top:24px;'>"
         "Carga archivos .xlsx · .csv · .txt</p>",
